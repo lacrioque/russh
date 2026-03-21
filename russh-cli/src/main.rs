@@ -5,9 +5,6 @@ use std::path::PathBuf;
 mod commands;
 mod ui;
 
-use ui::SessionPicker as _;
-use ui::inquire::InquirePicker;
-
 #[derive(Parser)]
 #[command(name = "russh", version, about = "A custom SSH client")]
 struct Cli {
@@ -16,7 +13,7 @@ struct Cli {
     config: Option<String>,
 
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Subcommand)]
@@ -36,7 +33,7 @@ enum Command {
         /// Session name
         session: String,
     },
-    /// Interactive menu
+    /// Interactive menu (default when no subcommand given)
     Menu,
 }
 
@@ -53,7 +50,7 @@ fn main() -> Result<()> {
         .map(PathBuf::from)
         .unwrap_or_else(default_config_path);
 
-    match cli.command {
+    match cli.command.unwrap_or(Command::Menu) {
         Command::List => {
             commands::list::run(cli.config.as_deref())?;
         }
@@ -67,12 +64,7 @@ fn main() -> Result<()> {
             commands::connect::run(&session, cli.config.as_deref())?;
         }
         Command::Menu => {
-            let picker = InquirePicker;
-            let sessions = vec![]; // placeholder: resolved sessions injected here by ru-jba.7
-            match picker.pick(&sessions)? {
-                Some(session) => println!("russh {} — connecting to {}", russh_core::version(), session.display_target),
-                None => println!("russh {} — no session selected", russh_core::version()),
-            }
+            commands::menu::run(cli.config.as_deref())?;
         }
     }
 
