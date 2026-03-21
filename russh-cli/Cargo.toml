@@ -1,0 +1,9 @@
+[package]
+name = "russh-cli"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+russh-core = { path = "../russh-core" }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }

@@ -1,0 +1,3 @@
+[workspace]
+members = ["russh-core", "russh-cli"]
+resolver = "2"
