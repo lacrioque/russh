@@ -29,11 +29,11 @@ enum Command {
     },
     /// Validate all sessions and report issues
     Check,
-    /// Connect to a host
+    /// Connect to a session by name
     #[command(alias = "c")]
     Connect {
-        /// Host to connect to
-        host: String,
+        /// Session name
+        session: String,
     },
     /// Interactive menu
     Menu,
@@ -41,6 +41,7 @@ enum Command {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let config_override = cli.config.as_deref();
 
     match cli.command {
         Command::List => {
@@ -52,8 +53,8 @@ fn main() -> Result<()> {
         Command::Check => {
             commands::check::run(cli.config.as_deref());
         }
-        Command::Connect { host } => {
-            println!("russh {} — connect {host}", russh_core::version());
+        Command::Connect { session } => {
+            commands::connect::run(&session, config_override)?;
         }
         Command::Menu => {
             let picker = InquirePicker;
