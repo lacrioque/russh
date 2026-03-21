@@ -172,6 +172,28 @@ mod tests {
     }
 
     #[test]
+    fn expand_tilde_no_home_returns_path_unchanged() {
+        with_env(&[("HOME", None)], || {
+            // Without HOME we cannot expand; original string is returned.
+            let result = expand_tilde("~/foo");
+            assert_eq!(result, "~/foo");
+        });
+    }
+
+    #[test]
+    fn expand_tilde_bare_no_home_returns_tilde() {
+        with_env(&[("HOME", None)], || {
+            let result = expand_tilde("~");
+            assert_eq!(result, "~");
+        });
+    }
+
+    #[test]
+    fn expand_tilde_empty_string() {
+        assert_eq!(expand_tilde(""), "");
+    }
+
+    #[test]
     fn config_path_xdg_empty_falls_back() {
         with_env(
             &[

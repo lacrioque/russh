@@ -177,6 +177,60 @@ username = "deploy"
     }
 
     #[test]
+    fn parse_session_with_all_fields() {
+        let toml = r#"
+[sessions.full]
+host = "192.168.0.1"
+username = "root"
+port = 22
+ssh_key = "~/.ssh/id_ed25519"
+tags = ["linux", "prod"]
+"#;
+        let sessions = parse_config(toml).unwrap();
+        let s = &sessions[0];
+        assert_eq!(s.host, "192.168.0.1");
+        assert_eq!(s.username.as_deref(), Some("root"));
+        assert_eq!(s.port, Some(22));
+        assert_eq!(s.ssh_key.as_deref(), Some("~/.ssh/id_ed25519"));
+        assert_eq!(s.tags, vec!["linux", "prod"]);
+    }
+
+    #[test]
+    fn parse_port_boundary_values() {
+        let toml = r#"
+[sessions.low]
+host = "1.2.3.4"
+port = 1
+
+[sessions.high]
+host = "1.2.3.5"
+port = 65535
+"#;
+        let sessions = parse_config(toml).unwrap();
+        let low = sessions.iter().find(|s| s.name == "low").unwrap();
+        let high = sessions.iter().find(|s| s.name == "high").unwrap();
+        assert_eq!(low.port, Some(1));
+        assert_eq!(high.port, Some(65535));
+    }
+
+    #[test]
+    fn parse_sessions_ordering_is_consistent() {
+        // BTreeMap iterates alphabetically, so all names should be reachable
+        let toml = r#"
+[sessions.zebra]
+host = "z.example.com"
+
+[sessions.apple]
+host = "a.example.com"
+"#;
+        let sessions = parse_config(toml).unwrap();
+        let names: std::collections::HashSet<&str> =
+            sessions.iter().map(|s| s.name.as_str()).collect();
+        assert!(names.contains("zebra"));
+        assert!(names.contains("apple"));
+    }
+
+    #[test]
     fn session_names_from_table_keys() {
         let toml = r#"
 [sessions.alpha]

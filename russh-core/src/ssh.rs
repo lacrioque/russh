@@ -169,4 +169,48 @@ mod tests {
         let dest = spec.args.last().unwrap();
         assert_eq!(dest, "deploy@prod.example.com");
     }
+
+    #[test]
+    fn args_order_port_before_key_before_destination() {
+        let spec = build_command(&make_resolved(|s| {
+            s.port = 2222;
+            s.ssh_key = Some("/keys/k".into());
+        }));
+        let p_idx = spec.args.iter().position(|a| a == "-p").unwrap();
+        let i_idx = spec.args.iter().position(|a| a == "-i").unwrap();
+        let dest_idx = spec.args.len() - 1;
+        assert!(p_idx < i_idx, "-p must come before -i");
+        assert!(i_idx < dest_idx, "-i must come before destination");
+    }
+
+    #[test]
+    fn ipv6_host_destination() {
+        let spec = build_command(&make_resolved(|s| {
+            s.host = "::1".into();
+            s.username = "root".into();
+        }));
+        let dest = spec.args.last().unwrap();
+        assert_eq!(dest, "root@::1");
+    }
+
+    #[test]
+    fn command_spec_clone() {
+        let spec = build_command(&make_resolved(|_| {}));
+        let cloned = spec.clone();
+        assert_eq!(cloned.executable, spec.executable);
+        assert_eq!(cloned.args, spec.args);
+        assert_eq!(cloned.display, spec.display);
+    }
+
+    #[test]
+    fn display_contains_executable() {
+        let spec = build_command(&make_resolved(|_| {}));
+        assert!(spec.display.starts_with("ssh "), "display: {}", spec.display);
+    }
+
+    #[test]
+    fn high_port_number_in_args() {
+        let spec = build_command(&make_resolved(|s| s.port = 65535));
+        assert!(spec.args.contains(&"65535".to_string()));
+    }
 }

@@ -198,4 +198,49 @@ mod tests {
         let r = resolve_session(&make_session(|_| {}));
         assert!(r.tags.is_empty());
     }
+
+    #[test]
+    fn unknown_fallback_when_user_not_set() {
+        with_env(&[("USER", None)], || {
+            let r = resolve_session(&make_session(|_| {}));
+            assert_eq!(r.username, "unknown");
+        });
+    }
+
+    #[test]
+    fn name_and_host_carry_through() {
+        let r = resolve_session(&make_session(|s| {
+            s.name = "mynode".into();
+            s.host = "192.168.100.200".into();
+        }));
+        assert_eq!(r.name, "mynode");
+        assert_eq!(r.host, "192.168.100.200");
+    }
+
+    #[test]
+    fn tags_whitespace_only_filtered() {
+        let r = resolve_session(&make_session(|s| {
+            s.tags = vec!["  ".into(), "\t".into()];
+        }));
+        assert!(r.tags.is_empty());
+    }
+
+    #[test]
+    fn tags_sorted_alphabetically() {
+        let r = resolve_session(&make_session(|s| {
+            s.tags = vec!["zebra".into(), "apple".into(), "mango".into()];
+        }));
+        assert_eq!(r.tags, vec!["apple", "mango", "zebra"]);
+    }
+
+    #[test]
+    fn tilde_only_ssh_key_expands() {
+        with_env(&[("HOME", Some("/home/testuser"))], || {
+            let r = resolve_session(&make_session(|s| {
+                s.ssh_key = Some("~".into());
+            }));
+            assert_eq!(r.ssh_key.as_deref(), Some("/home/testuser"));
+            assert_eq!(r.key_source, KeySource::Explicit);
+        });
+    }
 }

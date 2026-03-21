@@ -196,4 +196,46 @@ mod tests {
         assert!(display.contains("missing-host"));
         assert!(display.contains("test"));
     }
+
+    #[test]
+    fn validate_sessions_empty_slice() {
+        let issues = validate_sessions(&[]);
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn ipv4_address_has_no_hostname_warning() {
+        let issues = validate_session(&make_resolved(|s| s.host = "203.0.113.42".into()));
+        assert!(!codes(&issues).contains(&"hostname-not-ip".to_string()));
+    }
+
+    #[test]
+    fn ipv6_full_address_no_warning() {
+        let issues =
+            validate_session(&make_resolved(|s| s.host = "2001:db8::1".into()));
+        assert!(issues.is_empty(), "unexpected issues: {issues:?}");
+    }
+
+    #[test]
+    fn key_source_system_default_with_some_path_not_checked() {
+        // key_source=SystemDefault means we skip the file-existence check
+        // even if ssh_key is populated (defensive: shouldn't happen in practice).
+        let issues = validate_session(&make_resolved(|s| {
+            s.ssh_key = Some("/nonexistent/key".into());
+            s.key_source = KeySource::SystemDefault;
+        }));
+        assert!(!codes(&issues).contains(&"missing-key-file".to_string()));
+    }
+
+    #[test]
+    fn validate_sessions_aggregates_across_multiple_sessions() {
+        let sessions = vec![
+            make_resolved(|s| s.host = "good.ip".into()), // hostname warning
+            make_resolved(|s| s.port = 0),                 // port error
+            make_resolved(|_| {}),                          // clean
+        ];
+        let issues = validate_sessions(&sessions);
+        assert!(issues.iter().any(|i| i.code.as_deref() == Some("hostname-not-ip")));
+        assert!(issues.iter().any(|i| i.code.as_deref() == Some("invalid-port")));
+    }
 }

@@ -114,3 +114,172 @@ impl fmt::Display for ValidationIssue {
         write!(f, " {}", self.message)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- KeySource ---
+
+    #[test]
+    fn key_source_display_explicit() {
+        assert_eq!(KeySource::Explicit.to_string(), "explicit");
+    }
+
+    #[test]
+    fn key_source_display_system_default() {
+        assert_eq!(KeySource::SystemDefault.to_string(), "system_default");
+    }
+
+    #[test]
+    fn key_source_clone_and_eq() {
+        let a = KeySource::Explicit;
+        assert_eq!(a.clone(), KeySource::Explicit);
+        assert_ne!(KeySource::Explicit, KeySource::SystemDefault);
+    }
+
+    // --- Severity ---
+
+    #[test]
+    fn severity_display_error() {
+        assert_eq!(Severity::Error.to_string(), "error");
+    }
+
+    #[test]
+    fn severity_display_warning() {
+        assert_eq!(Severity::Warning.to_string(), "warning");
+    }
+
+    #[test]
+    fn severity_clone_and_eq() {
+        assert_eq!(Severity::Error.clone(), Severity::Error);
+        assert_ne!(Severity::Error, Severity::Warning);
+    }
+
+    // --- ValidationIssue Display ---
+
+    fn full_issue() -> ValidationIssue {
+        ValidationIssue {
+            severity: Severity::Error,
+            session_name: Some("myhost".into()),
+            field: Some("host".into()),
+            message: "host must not be empty".into(),
+            code: Some("missing-host".into()),
+        }
+    }
+
+    #[test]
+    fn validation_issue_display_full() {
+        let s = full_issue().to_string();
+        assert!(s.contains("error"), "missing severity: {s}");
+        assert!(s.contains("missing-host"), "missing code: {s}");
+        assert!(s.contains("myhost"), "missing session name: {s}");
+        assert!(s.contains("host"), "missing field: {s}");
+        assert!(s.contains("host must not be empty"), "missing message: {s}");
+    }
+
+    #[test]
+    fn validation_issue_display_no_code() {
+        let issue = ValidationIssue {
+            severity: Severity::Warning,
+            session_name: Some("s".into()),
+            field: None,
+            message: "advisory note".into(),
+            code: None,
+        };
+        let s = issue.to_string();
+        assert!(s.starts_with("warning:"), "expected no code brackets: {s}");
+        assert!(s.contains("advisory note"), "{s}");
+    }
+
+    #[test]
+    fn validation_issue_display_no_session_name() {
+        let issue = ValidationIssue {
+            severity: Severity::Error,
+            session_name: None,
+            field: Some("port".into()),
+            message: "bad port".into(),
+            code: Some("invalid-port".into()),
+        };
+        let s = issue.to_string();
+        assert!(!s.contains("session"), "unexpected session prefix: {s}");
+        assert!(s.contains("invalid-port"), "{s}");
+        assert!(s.contains("bad port"), "{s}");
+    }
+
+    #[test]
+    fn validation_issue_display_no_optional_fields() {
+        let issue = ValidationIssue {
+            severity: Severity::Warning,
+            session_name: None,
+            field: None,
+            message: "generic warning".into(),
+            code: None,
+        };
+        let s = issue.to_string();
+        assert_eq!(s, "warning: generic warning");
+    }
+
+    #[test]
+    fn validation_issue_clone() {
+        let issue = full_issue();
+        let cloned = issue.clone();
+        assert_eq!(cloned.message, issue.message);
+        assert_eq!(cloned.code, issue.code);
+    }
+
+    // --- Session construction ---
+
+    #[test]
+    fn session_field_defaults() {
+        let s = Session {
+            name: "demo".into(),
+            host: "1.2.3.4".into(),
+            username: None,
+            ssh_key: None,
+            port: None,
+            tags: vec![],
+        };
+        assert_eq!(s.name, "demo");
+        assert_eq!(s.host, "1.2.3.4");
+        assert!(s.username.is_none());
+        assert!(s.ssh_key.is_none());
+        assert!(s.port.is_none());
+        assert!(s.tags.is_empty());
+    }
+
+    #[test]
+    fn session_clone_is_independent() {
+        let s = Session {
+            name: "orig".into(),
+            host: "10.0.0.1".into(),
+            username: Some("alice".into()),
+            ssh_key: Some("~/.ssh/id_rsa".into()),
+            port: Some(2222),
+            tags: vec!["prod".into()],
+        };
+        let mut clone = s.clone();
+        clone.name = "copy".into();
+        assert_eq!(s.name, "orig");
+    }
+
+    // --- ResolvedSession construction ---
+
+    #[test]
+    fn resolved_session_clone() {
+        let r = ResolvedSession {
+            name: "r".into(),
+            host: "10.0.0.1".into(),
+            username: "bob".into(),
+            port: 22,
+            ssh_key: Some("/keys/k".into()),
+            key_source: KeySource::Explicit,
+            display_target: "bob@10.0.0.1:22".into(),
+            tags: vec!["web".into()],
+        };
+        let c = r.clone();
+        assert_eq!(c.name, r.name);
+        assert_eq!(c.key_source, r.key_source);
+        assert_eq!(c.tags, r.tags);
+    }
+}
