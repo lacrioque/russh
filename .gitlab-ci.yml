@@ -60,10 +60,10 @@ build:release:
   image: rust:latest
   script:
     - cargo build --release
-    - cp target/release/russh russh-cli
+    - cp target/release/russh russh
   artifacts:
     paths:
-      - russh-cli
+      - russh
     expire_in: 30 days
   cache:
     key: cargo-${CI_COMMIT_REF_SLUG}
@@ -94,5 +94,5 @@ release:
     description: "Release ${CI_COMMIT_TAG}"
     assets:
       links:
-        - name: "russh-cli (Linux x86_64)"
-          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/russh-cli"
+        - name: "russh (Linux x86_64)"
+          url: "${CI_PROJECT_URL}/-/jobs/${CI_JOB_ID}/artifacts/file/russh"
