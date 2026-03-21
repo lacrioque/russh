@@ -1,3 +1,8 @@
 [workspace]
 members = ["russh-core", "russh-cli"]
 resolver = "2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
