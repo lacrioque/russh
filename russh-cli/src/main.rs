@@ -1,6 +1,11 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 
+mod ui;
+
+use ui::SessionPicker as _;
+use ui::inquire::InquirePicker;
+
 #[derive(Parser)]
 #[command(name = "russh", version, about = "A custom SSH client")]
 struct Cli {
@@ -49,7 +54,12 @@ fn main() -> Result<()> {
             println!("russh {} — connect {host}", russh_core::version());
         }
         Command::Menu => {
-            println!("russh {} — menu", russh_core::version());
+            let picker = InquirePicker;
+            let sessions = vec![]; // placeholder: resolved sessions injected here by ru-jba.7
+            match picker.pick(&sessions)? {
+                Some(session) => println!("russh {} — connecting to {}", russh_core::version(), session.display_target),
+                None => println!("russh {} — no session selected", russh_core::version()),
+            }
         }
     }
 
