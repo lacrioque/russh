@@ -125,7 +125,10 @@ username = "root"
 "#;
         let err = parse_config(toml).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("missing"), "expected missing field error: {msg}");
+        assert!(
+            msg.contains("missing"),
+            "expected missing field error: {msg}"
+        );
     }
 
     #[test]

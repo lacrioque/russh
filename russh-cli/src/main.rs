@@ -46,7 +46,9 @@ fn default_config_path() -> PathBuf {
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    let config_path = cli.config.as_ref()
+    let config_path = cli
+        .config
+        .as_ref()
         .map(PathBuf::from)
         .unwrap_or_else(default_config_path);
 

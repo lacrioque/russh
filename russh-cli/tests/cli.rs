@@ -17,10 +17,7 @@ fn russh() -> Command {
 
 // Path to the checked-in fixture with three clean sessions.
 fn fixture(name: &str) -> String {
-    format!(
-        "{}/tests/fixtures/{name}",
-        env!("CARGO_MANIFEST_DIR")
-    )
+    format!("{}/tests/fixtures/{name}", env!("CARGO_MANIFEST_DIR"))
 }
 
 // ── list ─────────────────────────────────────────────────────────────────────
@@ -93,7 +90,12 @@ fn show_known_session_displays_details() {
 fn show_session_with_defaults_shows_resolved_values() {
     // "charlie" has no username or port; show should display resolved defaults.
     russh()
-        .args(["--config", &fixture("three_sessions.toml"), "show", "charlie"])
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "show",
+            "charlie",
+        ])
         .assert()
         .success()
         .stdout(predicate::str::contains("charlie"))
@@ -103,7 +105,12 @@ fn show_session_with_defaults_shows_resolved_values() {
 #[test]
 fn show_unknown_session_exits_nonzero() {
     russh()
-        .args(["--config", &fixture("three_sessions.toml"), "show", "nosuchsession"])
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "show",
+            "nosuchsession",
+        ])
         .assert()
         .failure();
 }
@@ -111,7 +118,12 @@ fn show_unknown_session_exits_nonzero() {
 #[test]
 fn show_unknown_session_includes_name_in_error() {
     russh()
-        .args(["--config", &fixture("three_sessions.toml"), "show", "nosuchsession"])
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "show",
+            "nosuchsession",
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("nosuchsession"));
@@ -176,7 +188,12 @@ fn check_missing_config_exits_two() {
 #[test]
 fn connect_unknown_session_exits_nonzero() {
     russh()
-        .args(["--config", &fixture("three_sessions.toml"), "connect", "nosuchsession"])
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "connect",
+            "nosuchsession",
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("nosuchsession"));
@@ -185,7 +202,12 @@ fn connect_unknown_session_exits_nonzero() {
 #[test]
 fn connect_alias_c_unknown_session_exits_nonzero() {
     russh()
-        .args(["--config", &fixture("three_sessions.toml"), "c", "nosuchsession"])
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "c",
+            "nosuchsession",
+        ])
         .assert()
         .failure();
 }
@@ -201,7 +223,12 @@ port = 0
 "#,
     );
     russh()
-        .args(["--config", cfg.path().to_str().unwrap(), "connect", "badport"])
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "connect",
+            "badport",
+        ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("launch-blocking"));

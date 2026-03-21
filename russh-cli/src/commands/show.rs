@@ -24,12 +24,12 @@ pub fn run(target: &str, config_path: &Path) -> Result<()> {
     println!("  host        {}", session.host);
 
     match &session.username {
-        Some(u) => println!("  username    {} (configured)", u),
+        Some(u) => println!("  username    {u} (configured)"),
         None => println!("  username    {} (default: OS user)", resolved.username),
     }
 
     match session.port {
-        Some(p) => println!("  port        {} (configured)", p),
+        Some(p) => println!("  port        {p} (configured)"),
         None => println!("  port        {} (default)", resolved.port),
     }
 
@@ -37,9 +37,9 @@ pub fn run(target: &str, config_path: &Path) -> Result<()> {
         Some(raw) => {
             let expanded = resolved.ssh_key.as_deref().unwrap_or(raw);
             if expanded != raw {
-                println!("  ssh_key     {} → {} (expanded)", raw, expanded);
+                println!("  ssh_key     {raw} → {expanded} (expanded)");
             } else {
-                println!("  ssh_key     {}", raw);
+                println!("  ssh_key     {raw}");
             }
         }
         None => println!("  ssh_key     (system default)"),

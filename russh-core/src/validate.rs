@@ -93,10 +93,7 @@ mod tests {
     }
 
     fn codes(issues: &[ValidationIssue]) -> Vec<String> {
-        issues
-            .iter()
-            .filter_map(|i| i.code.clone())
-            .collect()
+        issues.iter().filter_map(|i| i.code.clone()).collect()
     }
 
     #[test]
@@ -122,7 +119,10 @@ mod tests {
     fn port_zero_is_error() {
         let issues = validate_session(&make_resolved(|s| s.port = 0));
         assert!(codes(&issues).contains(&"invalid-port".to_string()));
-        let port_issue = issues.iter().find(|i| i.code.as_deref() == Some("invalid-port")).unwrap();
+        let port_issue = issues
+            .iter()
+            .find(|i| i.code.as_deref() == Some("invalid-port"))
+            .unwrap();
         assert_eq!(port_issue.severity, Severity::Error);
     }
 
@@ -211,8 +211,7 @@ mod tests {
 
     #[test]
     fn ipv6_full_address_no_warning() {
-        let issues =
-            validate_session(&make_resolved(|s| s.host = "2001:db8::1".into()));
+        let issues = validate_session(&make_resolved(|s| s.host = "2001:db8::1".into()));
         assert!(issues.is_empty(), "unexpected issues: {issues:?}");
     }
 
@@ -231,11 +230,15 @@ mod tests {
     fn validate_sessions_aggregates_across_multiple_sessions() {
         let sessions = vec![
             make_resolved(|s| s.host = "good.ip".into()), // hostname warning
-            make_resolved(|s| s.port = 0),                 // port error
-            make_resolved(|_| {}),                          // clean
+            make_resolved(|s| s.port = 0),                // port error
+            make_resolved(|_| {}),                        // clean
         ];
         let issues = validate_sessions(&sessions);
-        assert!(issues.iter().any(|i| i.code.as_deref() == Some("hostname-not-ip")));
-        assert!(issues.iter().any(|i| i.code.as_deref() == Some("invalid-port")));
+        assert!(issues
+            .iter()
+            .any(|i| i.code.as_deref() == Some("hostname-not-ip")));
+        assert!(issues
+            .iter()
+            .any(|i| i.code.as_deref() == Some("invalid-port")));
     }
 }

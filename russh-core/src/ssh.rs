@@ -61,9 +61,7 @@ pub fn exec_ssh(spec: &CommandSpec) -> Result<(), ExecError> {
     {
         use std::os::unix::process::CommandExt;
         // exec replaces the process — only returns on error
-        let err = Command::new(&spec.executable)
-            .args(&spec.args)
-            .exec();
+        let err = Command::new(&spec.executable).args(&spec.args).exec();
         // If we reach here, exec failed
         if err.kind() == io::ErrorKind::NotFound {
             Err(ExecError::NotFound(err))
@@ -130,7 +128,13 @@ mod tests {
         }));
         assert_eq!(
             spec.args,
-            vec!["-p", "22", "-i", "/home/admin/.ssh/id_rsa", "admin@10.0.0.1"]
+            vec![
+                "-p",
+                "22",
+                "-i",
+                "/home/admin/.ssh/id_rsa",
+                "admin@10.0.0.1"
+            ]
         );
     }
 
@@ -205,7 +209,11 @@ mod tests {
     #[test]
     fn display_contains_executable() {
         let spec = build_command(&make_resolved(|_| {}));
-        assert!(spec.display.starts_with("ssh "), "display: {}", spec.display);
+        assert!(
+            spec.display.starts_with("ssh "),
+            "display: {}",
+            spec.display
+        );
     }
 
     #[test]

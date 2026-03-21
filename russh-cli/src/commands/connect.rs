@@ -1,12 +1,5 @@
 use anyhow::{bail, Context as _};
-use russh_core::{
-    config,
-    model::Severity,
-    paths,
-    resolve,
-    ssh,
-    validate,
-};
+use russh_core::{config, model::Severity, paths, resolve, ssh, validate};
 
 /// Run the connect command: locate session by name, validate, and exec SSH.
 ///
@@ -15,8 +8,8 @@ use russh_core::{
 /// errors, then execs `ssh`. On success this function never returns —
 /// the process is replaced by the SSH process.
 pub fn run(session_name: &str, config_override: Option<&str>) -> anyhow::Result<()> {
-    let config_path = paths::config_path(config_override)
-        .context("could not determine config path")?;
+    let config_path =
+        paths::config_path(config_override).context("could not determine config path")?;
 
     let sessions = config::load_config(&config_path)
         .with_context(|| format!("failed to load config: {}", config_path.display()))?;
@@ -42,8 +35,7 @@ pub fn run(session_name: &str, config_override: Option<&str>) -> anyhow::Result<
     }
 
     let spec = ssh::build_command(&resolved);
-    ssh::exec_ssh(&spec)
-        .with_context(|| format!("failed to exec: {}", spec.display))?;
+    ssh::exec_ssh(&spec).with_context(|| format!("failed to exec: {}", spec.display))?;
 
     Ok(())
 }

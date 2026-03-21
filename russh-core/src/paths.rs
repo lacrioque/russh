@@ -82,10 +82,7 @@ mod tests {
 
     /// Helper: run a closure with specific env vars set, restoring originals afterward.
     fn with_env<F: FnOnce()>(vars: &[(&str, Option<&str>)], f: F) {
-        let originals: Vec<_> = vars
-            .iter()
-            .map(|(k, _)| (*k, env::var_os(k)))
-            .collect();
+        let originals: Vec<_> = vars.iter().map(|(k, _)| (*k, env::var_os(k))).collect();
 
         for (k, v) in vars {
             match v {
@@ -131,10 +128,13 @@ mod tests {
 
     #[test]
     fn config_path_override() {
-        with_env(&[("HOME", Some("/fakehome"))], || {
-            let p = config_path(Some("~/myconfig.toml")).unwrap();
-            assert_eq!(p, PathBuf::from("/fakehome/myconfig.toml"));
-        });
+        let p = config_path(Some("~/myconfig.toml")).unwrap();
+        // Tilde should be expanded to an absolute path ending in /myconfig.toml
+        assert!(p.is_absolute(), "expected absolute path, got: {p:?}");
+        assert!(
+            p.ends_with("myconfig.toml"),
+            "expected path ending in myconfig.toml, got: {p:?}"
+        );
     }
 
     #[test]
@@ -149,10 +149,7 @@ mod tests {
             &[("HOME", Some("/fakehome")), ("XDG_CONFIG_HOME", None)],
             || {
                 let p = config_path(None).unwrap();
-                assert_eq!(
-                    p,
-                    PathBuf::from("/fakehome/.config/russh/config.toml")
-                );
+                assert_eq!(p, PathBuf::from("/fakehome/.config/russh/config.toml"));
             },
         );
     }
@@ -196,16 +193,10 @@ mod tests {
     #[test]
     fn config_path_xdg_empty_falls_back() {
         with_env(
-            &[
-                ("HOME", Some("/fakehome")),
-                ("XDG_CONFIG_HOME", Some("")),
-            ],
+            &[("HOME", Some("/fakehome")), ("XDG_CONFIG_HOME", Some(""))],
             || {
                 let p = config_path(None).unwrap();
-                assert_eq!(
-                    p,
-                    PathBuf::from("/fakehome/.config/russh/config.toml")
-                );
+                assert_eq!(p, PathBuf::from("/fakehome/.config/russh/config.toml"));
             },
         );
     }

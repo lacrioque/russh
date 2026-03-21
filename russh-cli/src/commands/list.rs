@@ -22,11 +22,10 @@ struct Row {
 }
 
 pub fn run(config_override: Option<&str>) -> Result<()> {
-    let path = config_path(config_override)
-        .context("could not determine config path")?;
+    let path = config_path(config_override).context("could not determine config path")?;
 
-    let sessions = load_config(&path)
-        .with_context(|| format!("failed to load config: {}", path.display()))?;
+    let sessions =
+        load_config(&path).with_context(|| format!("failed to load config: {}", path.display()))?;
 
     let rows: Vec<Row> = sessions
         .iter()

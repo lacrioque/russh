@@ -33,8 +33,14 @@ pub fn run(config_override: Option<&str>) -> ! {
     let resolved: Vec<_> = sessions.iter().map(resolve_session).collect();
     let issues = validate_sessions(&resolved);
 
-    let errors: Vec<_> = issues.iter().filter(|i| i.severity == Severity::Error).collect();
-    let warnings: Vec<_> = issues.iter().filter(|i| i.severity == Severity::Warning).collect();
+    let errors: Vec<_> = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Error)
+        .collect();
+    let warnings: Vec<_> = issues
+        .iter()
+        .filter(|i| i.severity == Severity::Warning)
+        .collect();
 
     if !errors.is_empty() {
         println!("Errors ({}):", errors.len());
@@ -51,7 +57,10 @@ pub fn run(config_override: Option<&str>) -> ! {
     }
 
     if issues.is_empty() {
-        println!("OK: {} session(s) validated, no issues found", resolved.len());
+        println!(
+            "OK: {} session(s) validated, no issues found",
+            resolved.len()
+        );
         process::exit(0);
     } else if errors.is_empty() {
         process::exit(1);
