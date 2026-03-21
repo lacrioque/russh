@@ -60,7 +60,7 @@ build:release:
   image: rust:latest
   script:
     - cargo build --release
-    - cp target/release/russh-cli russh-cli
+    - cp target/release/russh russh-cli
   artifacts:
     paths:
       - russh-cli
