@@ -1,0 +1,15 @@
+[sessions.alpha]
+host = "10.0.0.1"
+username = "alice"
+port = 22
+tags = ["prod"]
+
+[sessions.bravo]
+host = "10.0.0.2"
+username = "bob"
+port = 2222
+tags = ["staging"]
+
+[sessions.charlie]
+host = "10.0.0.3"
+tags = ["dev"]
