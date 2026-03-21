@@ -8,3 +8,4 @@ russh-core = { path = "../russh-core" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 inquire = "0.7"
+tabled = "0.17"

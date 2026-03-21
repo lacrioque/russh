@@ -45,7 +45,7 @@ fn main() -> Result<()> {
 
     match cli.command {
         Command::List => {
-            println!("russh {} — list", russh_core::version());
+            commands::list::run(cli.config.as_deref())?;
         }
         Command::Show { target } => {
             println!("russh {} — show {target}", russh_core::version());
