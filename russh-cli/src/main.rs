@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 mod commands;
 mod ui;
@@ -39,22 +40,31 @@ enum Command {
     Menu,
 }
 
+fn default_config_path() -> PathBuf {
+    dirs_next::config_dir()
+        .map(|d| d.join("russh").join("config.toml"))
+        .unwrap_or_else(|| PathBuf::from("~/.config/russh/config.toml"))
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
-    let config_override = cli.config.as_deref();
+
+    let config_path = cli.config.as_ref()
+        .map(PathBuf::from)
+        .unwrap_or_else(default_config_path);
 
     match cli.command {
         Command::List => {
             commands::list::run(cli.config.as_deref())?;
         }
         Command::Show { target } => {
-            println!("russh {} — show {target}", russh_core::version());
+            commands::show::run(&target, &config_path)?;
         }
         Command::Check => {
             commands::check::run(cli.config.as_deref());
         }
         Command::Connect { session } => {
-            commands::connect::run(&session, config_override)?;
+            commands::connect::run(&session, cli.config.as_deref())?;
         }
         Command::Menu => {
             let picker = InquirePicker;
