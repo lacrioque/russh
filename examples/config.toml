@@ -1,0 +1,39 @@
+# russh configuration example
+#
+# Default location: ~/.config/russh/config.toml
+# Override with: russh --config /path/to/config.toml
+#
+# Each session is defined as [sessions.<name>].
+# The name is used with `russh connect <name>`.
+
+# Minimal session — only host is required.
+[sessions.homelab]
+host = "192.168.1.10"
+
+# Full session with all optional fields set.
+[sessions.dev-server]
+host = "10.0.0.50"
+username = "deploy"
+port = 2222
+ssh_key = "~/.ssh/id_ed25519"
+tags = ["dev", "linux"]
+
+# Production server with custom key and tags.
+[sessions.prod-web]
+host = "prod.example.com"
+username = "ubuntu"
+ssh_key = "~/.ssh/prod_key"
+tags = ["prod", "web"]
+
+# Jump host on a non-standard port.
+[sessions.bastion]
+host = "bastion.example.com"
+username = "ops"
+port = 2222
+tags = ["infra", "bastion"]
+
+# Staging environment — uses system default key and port.
+[sessions.staging]
+host = "staging.example.com"
+username = "admin"
+tags = ["staging"]
