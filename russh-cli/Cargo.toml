@@ -1,6 +1,6 @@
 [package]
 name = "russh-cli"
-version = "0.0.1"
+version = "0.1.2"
 edition = "2021"
 
 [[bin]]
