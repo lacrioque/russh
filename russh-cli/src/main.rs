@@ -33,6 +33,22 @@ enum Command {
         /// Session name
         session: String,
     },
+    /// Insert a new session into the config
+    ///
+    /// Example: russh i myconn user@1.2.3.4 -p 2222 -i ~/.ssh/id_ed25519
+    #[command(alias = "i")]
+    Insert {
+        /// Session name
+        name: String,
+        /// SSH target (user@host or just host)
+        target: String,
+        /// SSH port
+        #[arg(short, long)]
+        port: Option<u16>,
+        /// Path to SSH identity file (private key)
+        #[arg(short = 'i', long = "identity")]
+        identity: Option<String>,
+    },
     /// Interactive menu (default when no subcommand given)
     Menu,
 }
@@ -64,6 +80,9 @@ fn main() -> Result<()> {
         }
         Command::Connect { session } => {
             commands::connect::run(&session, cli.config.as_deref())?;
+        }
+        Command::Insert { name, target, port, identity } => {
+            commands::insert::run(&name, &target, port, identity.as_deref(), cli.config.as_deref())?;
         }
         Command::Menu => {
             commands::menu::run(cli.config.as_deref())?;
