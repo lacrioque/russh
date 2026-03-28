@@ -22,6 +22,12 @@ pub struct CommandSpec {
 pub fn build_command(session: &ResolvedSession) -> CommandSpec {
     let mut args = Vec::new();
 
+    // Jump host (ProxyJump) — must come before other args
+    if let Some(ref jump) = session.jump_target {
+        args.push("-J".into());
+        args.push(jump.clone());
+    }
+
     args.push("-p".into());
     args.push(session.port.to_string());
 
@@ -102,6 +108,7 @@ mod tests {
             key_source: KeySource::SystemDefault,
             display_target: "admin@10.0.0.1:22".into(),
             tags: vec![],
+            jump_target: None,
         };
         overrides(&mut s);
         s

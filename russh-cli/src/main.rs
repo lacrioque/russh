@@ -48,6 +48,9 @@ enum Command {
         /// Path to SSH identity file (private key)
         #[arg(short = 'i', long = "identity")]
         identity: Option<String>,
+        /// Jump host — name of another session to proxy through
+        #[arg(short = 'J', long = "jump")]
+        jump: Option<String>,
     },
     /// Interactive menu (default when no subcommand given)
     Menu,
@@ -81,8 +84,8 @@ fn main() -> Result<()> {
         Command::Connect { session } => {
             commands::connect::run(&session, cli.config.as_deref())?;
         }
-        Command::Insert { name, target, port, identity } => {
-            commands::insert::run(&name, &target, port, identity.as_deref(), cli.config.as_deref())?;
+        Command::Insert { name, target, port, identity, jump } => {
+            commands::insert::run(&name, &target, port, identity.as_deref(), jump.as_deref(), cli.config.as_deref())?;
         }
         Command::Menu => {
             commands::menu::run(cli.config.as_deref())?;

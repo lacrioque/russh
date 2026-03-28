@@ -1,6 +1,6 @@
 use anyhow::Result;
 use russh_core::config::load_config;
-use russh_core::resolve::resolve_session;
+use russh_core::resolve::resolve_session_with_jump;
 use std::path::Path;
 
 /// Display detailed information for a named session.
@@ -16,7 +16,7 @@ pub fn run(target: &str, config_path: &Path) -> Result<()> {
         .find(|s| s.name == target)
         .ok_or_else(|| anyhow::anyhow!("unknown session: \"{target}\""))?;
 
-    let resolved = resolve_session(session);
+    let resolved = resolve_session_with_jump(session, &sessions);
 
     println!("Session: {}", session.name);
     println!();
@@ -51,8 +51,16 @@ pub fn run(target: &str, config_path: &Path) -> Result<()> {
         println!("  tags        {}", session.tags.join(", "));
     }
 
+    match &session.jump {
+        Some(j) => println!("  jump        {}", j),
+        None => println!("  jump        (none)"),
+    }
+
     println!();
     println!("  target      {}", resolved.display_target);
+    if let Some(ref jt) = resolved.jump_target {
+        println!("  jump via    {}", jt);
+    }
 
     Ok(())
 }

@@ -15,12 +15,13 @@ fn parse_target(target: &str) -> (Option<String>, String) {
 
 /// Run the insert command: parse SSH-style arguments, write to config, optionally connect.
 ///
-/// Usage: russh i <name> user@host [-p port] [-i /path/to/key]
+/// Usage: russh i <name> user@host [-p port] [-i /path/to/key] [-J jump_session]
 pub fn run(
     name: &str,
     target: &str,
     port: Option<u16>,
     identity: Option<&str>,
+    jump: Option<&str>,
     config_override: Option<&str>,
 ) -> anyhow::Result<()> {
     let config_path =
@@ -54,6 +55,9 @@ pub fn run(
     if let Some(key) = identity {
         block.push_str(&format!("ssh_key = \"{}\"\n", key));
     }
+    if let Some(j) = jump {
+        block.push_str(&format!("jump = \"{}\"\n", j));
+    }
 
     // Ensure config directory exists
     if let Some(parent) = config_path.parent() {
@@ -75,12 +79,14 @@ pub fn run(
     let display_user = username.as_deref().unwrap_or("(default)");
     let display_port = port.map_or("22".to_string(), |p| p.to_string());
     let display_key = identity.unwrap_or("(system default)");
+    let display_jump = jump.unwrap_or("(none)");
 
     println!("Session \"{}\" added to {}", name, config_path.display());
     println!("  Host:     {}", host);
     println!("  User:     {}", display_user);
     println!("  Port:     {}", display_port);
     println!("  SSH Key:  {}", display_key);
+    println!("  Jump:     {}", display_jump);
 
     // Ask if user wants to connect
     print!("\nConnect now? [Y/n] ");

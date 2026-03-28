@@ -37,3 +37,11 @@ tags = ["infra", "bastion"]
 host = "staging.example.com"
 username = "admin"
 tags = ["staging"]
+
+# Internal server accessible only through the bastion jump host.
+[sessions.internal-db]
+host = "10.0.0.50"
+username = "dbadmin"
+port = 5432
+jump = "bastion"
+tags = ["internal", "database"]

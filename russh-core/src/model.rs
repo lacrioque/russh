@@ -21,6 +21,8 @@ pub struct Session {
     /// Optional grouping/filtering labels.
     #[serde(default)]
     pub tags: Vec<String>,
+    /// Optional jump host — name of another session to proxy through.
+    pub jump: Option<String>,
 }
 
 /// Where the SSH key came from after resolution.
@@ -62,6 +64,8 @@ pub struct ResolvedSession {
     pub display_target: String,
     /// Tags for grouping and filtering.
     pub tags: Vec<String>,
+    /// Resolved jump host target string (e.g. `ops@bastion:2222`), or `None`.
+    pub jump_target: Option<String>,
 }
 
 /// Severity of a validation finding.
@@ -239,6 +243,7 @@ mod tests {
             ssh_key: None,
             port: None,
             tags: vec![],
+            jump: None,
         };
         assert_eq!(s.name, "demo");
         assert_eq!(s.host, "1.2.3.4");
@@ -246,6 +251,7 @@ mod tests {
         assert!(s.ssh_key.is_none());
         assert!(s.port.is_none());
         assert!(s.tags.is_empty());
+        assert!(s.jump.is_none());
     }
 
     #[test]
@@ -257,6 +263,7 @@ mod tests {
             ssh_key: Some("~/.ssh/id_rsa".into()),
             port: Some(2222),
             tags: vec!["prod".into()],
+            jump: None,
         };
         let mut clone = s.clone();
         clone.name = "copy".into();
@@ -276,6 +283,7 @@ mod tests {
             key_source: KeySource::Explicit,
             display_target: "bob@10.0.0.1:22".into(),
             tags: vec!["web".into()],
+            jump_target: None,
         };
         let c = r.clone();
         assert_eq!(c.name, r.name);

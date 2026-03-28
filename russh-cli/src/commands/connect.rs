@@ -4,9 +4,9 @@ use russh_core::{config, model::Severity, paths, resolve, ssh, validate};
 /// Run the connect command: locate session by name, validate, and exec SSH.
 ///
 /// Loads the config from the default path (or `config_override` if given),
-/// finds the session by name, resolves defaults, checks for launch-blocking
-/// errors, then execs `ssh`. On success this function never returns —
-/// the process is replaced by the SSH process.
+/// finds the session by name, resolves defaults (including jump host),
+/// checks for launch-blocking errors, then execs `ssh`. On success this
+/// function never returns — the process is replaced by the SSH process.
 pub fn run(session_name: &str, config_override: Option<&str>) -> anyhow::Result<()> {
     let config_path =
         paths::config_path(config_override).context("could not determine config path")?;
@@ -19,7 +19,7 @@ pub fn run(session_name: &str, config_override: Option<&str>) -> anyhow::Result<
         .find(|s| s.name == session_name)
         .with_context(|| format!("session not found: {session_name}"))?;
 
-    let resolved = resolve::resolve_session(session);
+    let resolved = resolve::resolve_session_with_jump(session, &sessions);
 
     let issues = validate::validate_session(&resolved);
     let errors: Vec<_> = issues

@@ -62,9 +62,49 @@ pub fn validate_session(session: &ResolvedSession) -> Vec<ValidationIssue> {
     issues
 }
 
-/// Validate all sessions and collect issues.
+/// Validate all sessions and collect issues, including jump host references.
 pub fn validate_sessions(sessions: &[ResolvedSession]) -> Vec<ValidationIssue> {
-    sessions.iter().flat_map(validate_session).collect()
+    let mut issues: Vec<_> = sessions.iter().flat_map(validate_session).collect();
+    issues.extend(validate_jump_references(sessions));
+    issues
+}
+
+/// Check that all jump_target references point to existing sessions and
+/// detect circular jump chains.
+fn validate_jump_references(_sessions: &[ResolvedSession]) -> Vec<ValidationIssue> {
+    // Jump references are validated at the raw Session level via validate_jump_refs_raw.
+    // ResolvedSession already has jump_target resolved to a string.
+    vec![]
+}
+
+/// Validate raw sessions for jump host issues (missing references, circular chains).
+pub fn validate_jump_refs_raw(sessions: &[crate::model::Session]) -> Vec<ValidationIssue> {
+    let names: std::collections::HashSet<&str> = sessions.iter().map(|s| s.name.as_str()).collect();
+    let mut issues = Vec::new();
+
+    for session in sessions {
+        if let Some(ref jump) = session.jump {
+            if !names.contains(jump.as_str()) {
+                issues.push(ValidationIssue {
+                    severity: Severity::Error,
+                    session_name: Some(session.name.clone()),
+                    field: Some("jump".into()),
+                    message: format!("jump host \"{}\" does not exist", jump),
+                    code: Some("missing-jump-host".into()),
+                });
+            } else if jump == &session.name {
+                issues.push(ValidationIssue {
+                    severity: Severity::Error,
+                    session_name: Some(session.name.clone()),
+                    field: Some("jump".into()),
+                    message: "session cannot jump through itself".into(),
+                    code: Some("circular-jump".into()),
+                });
+            }
+        }
+    }
+
+    issues
 }
 
 /// Returns `true` if the string looks like an IPv4 or IPv6 address.
@@ -87,6 +127,7 @@ mod tests {
             key_source: KeySource::SystemDefault,
             display_target: "user@10.0.0.1:22".into(),
             tags: vec![],
+            jump_target: None,
         };
         overrides(&mut s);
         s

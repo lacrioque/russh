@@ -4,12 +4,39 @@ use std::env;
 
 const DEFAULT_PORT: u16 = 22;
 
+/// Resolves a raw [`Session`] into a [`ResolvedSession`] with all defaults applied,
+/// including jump host resolution.
+///
+/// If the session has a `jump` field referencing another session name, that session
+/// is resolved and its `user@host:port` string is stored in `jump_target`.
+///
+/// Use this when you have the full session list available. Falls back to
+/// [`resolve_session`] for sessions without a jump host.
+pub fn resolve_session_with_jump(session: &Session, all_sessions: &[Session]) -> ResolvedSession {
+    let mut resolved = resolve_session(session);
+
+    if let Some(ref jump_name) = session.jump {
+        if let Some(jump_session) = all_sessions.iter().find(|s| s.name == *jump_name) {
+            let jump_resolved = resolve_session(jump_session);
+            resolved.jump_target = Some(format!(
+                "{}@{}:{}",
+                jump_resolved.username, jump_resolved.host, jump_resolved.port
+            ));
+        }
+    }
+
+    resolved
+}
+
 /// Resolves a raw [`Session`] into a [`ResolvedSession`] with all defaults applied.
 ///
 /// - Missing `username` → current OS user (`USER` on Unix, `USERNAME` on Windows).
 /// - Missing `port` → 22.
 /// - `ssh_key` with leading `~` → expanded via [`expand_tilde`].
 /// - Tags are trimmed, deduplicated, and sorted.
+///
+/// Note: Does not resolve jump hosts. Use [`resolve_session_with_jump`] when
+/// the full session list is available.
 pub fn resolve_session(session: &Session) -> ResolvedSession {
     let username = session
         .username
@@ -36,6 +63,7 @@ pub fn resolve_session(session: &Session) -> ResolvedSession {
         key_source,
         display_target,
         tags,
+        jump_target: None,
     }
 }
 
@@ -80,6 +108,7 @@ mod tests {
             ssh_key: None,
             port: None,
             tags: vec![],
+            jump: None,
         };
         overrides(&mut s);
         s
