@@ -54,6 +54,8 @@ enum Command {
     },
     /// Interactive menu (default when no subcommand given)
     Menu,
+    /// Show version and default config path
+    Version,
 }
 
 fn default_config_path() -> PathBuf {
@@ -89,6 +91,9 @@ fn main() -> Result<()> {
         }
         Command::Menu => {
             commands::menu::run(cli.config.as_deref())?;
+        }
+        Command::Version => {
+            commands::version::run();
         }
     }
 
