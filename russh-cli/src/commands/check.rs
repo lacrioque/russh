@@ -1,11 +1,12 @@
 use std::path::PathBuf;
 use std::process;
 
-use russh_core::config::load_config;
 use russh_core::model::Severity;
 use russh_core::paths::config_path;
 use russh_core::resolve::resolve_session;
 use russh_core::validate::validate_sessions;
+
+use super::init_config::load_or_create_config;
 
 /// Run `check`: validate all sessions and report issues grouped by severity.
 ///
@@ -22,7 +23,7 @@ pub fn run(config_override: Option<&str>) -> ! {
         }
     };
 
-    let sessions = match load_config(&path) {
+    let sessions = match load_or_create_config(&path) {
         Ok(s) => s,
         Err(e) => {
             eprintln!("error: {e}");

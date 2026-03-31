@@ -1,5 +1,7 @@
 use anyhow::{bail, Context as _};
-use russh_core::{config, model::Severity, paths, resolve, ssh, validate};
+use russh_core::{model::Severity, paths, resolve, ssh, validate};
+
+use super::init_config::load_or_create_config;
 
 /// Run the connect command: locate session by name, validate, and exec SSH.
 ///
@@ -11,8 +13,7 @@ pub fn run(session_name: &str, config_override: Option<&str>) -> anyhow::Result<
     let config_path =
         paths::config_path(config_override).context("could not determine config path")?;
 
-    let sessions = config::load_config(&config_path)
-        .with_context(|| format!("failed to load config: {}", config_path.display()))?;
+    let sessions = load_or_create_config(&config_path)?;
 
     let session = sessions
         .iter()

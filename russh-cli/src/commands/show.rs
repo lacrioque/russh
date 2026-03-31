@@ -1,7 +1,8 @@
 use anyhow::Result;
-use russh_core::config::load_config;
 use russh_core::resolve::resolve_session_with_jump;
 use std::path::Path;
+
+use super::init_config::load_or_create_config;
 
 /// Display detailed information for a named session.
 ///
@@ -9,7 +10,7 @@ use std::path::Path;
 /// resolved values (with defaults applied) so the user can see exactly
 /// what SSH will use.
 pub fn run(target: &str, config_path: &Path) -> Result<()> {
-    let sessions = load_config(config_path)?;
+    let sessions = load_or_create_config(config_path)?;
 
     let session = sessions
         .iter()

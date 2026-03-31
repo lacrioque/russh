@@ -1,9 +1,10 @@
 use anyhow::{Context, Result};
-use russh_core::config::load_config;
 use russh_core::model::KeySource;
 use russh_core::paths::config_path;
 use russh_core::resolve::resolve_session;
 use tabled::{Table, Tabled};
+
+use super::init_config::load_or_create_config;
 
 #[derive(Tabled)]
 struct Row {
@@ -24,8 +25,7 @@ struct Row {
 pub fn run(config_override: Option<&str>) -> Result<()> {
     let path = config_path(config_override).context("could not determine config path")?;
 
-    let sessions =
-        load_config(&path).with_context(|| format!("failed to load config: {}", path.display()))?;
+    let sessions = load_or_create_config(&path)?;
 
     let rows: Vec<Row> = sessions
         .iter()
