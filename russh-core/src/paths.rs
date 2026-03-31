@@ -81,7 +81,9 @@ mod tests {
     use std::env;
 
     /// Helper: run a closure with specific env vars set, restoring originals afterward.
+    /// Acquires ENV_MUTEX to prevent races with other env-mutating tests.
     fn with_env<F: FnOnce()>(vars: &[(&str, Option<&str>)], f: F) {
+        let _lock = crate::test_util::ENV_MUTEX.lock().unwrap();
         let originals: Vec<_> = vars.iter().map(|(k, _)| (*k, env::var_os(k))).collect();
 
         for (k, v) in vars {
