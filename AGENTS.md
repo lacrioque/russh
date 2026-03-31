@@ -1,0 +1,126 @@
+# Russh — AI Agent Usage Guide
+
+Russh is an SSH session manager. It stores named SSH sessions in a TOML config
+and delegates to the system `ssh` binary. You can use it to run commands on
+remote hosts without needing raw SSH credentials or connection details.
+
+## When to use russh
+
+Use russh when you need to:
+- Run a command on a remote host the user has configured
+- Check service status, logs, disk usage, or process state on remote machines
+- Verify deployments or configuration on remote systems
+- List what hosts are available before suggesting SSH operations
+
+Do NOT use russh to:
+- Transfer files (use `scp` or `rsync` directly if needed)
+- Modify SSH keys or credentials
+- Change the russh config without the user asking
+
+## Available commands
+
+### List sessions (safe, read-only)
+```bash
+russh list
+```
+Shows all configured SSH sessions with host, user, port, and tags.
+Use this first to discover what hosts are available.
+
+### Show session details (safe, read-only)
+```bash
+russh show <session-name>
+```
+Shows raw config and resolved values (with defaults applied) for one session.
+Use this to understand connection parameters before connecting.
+
+### Validate config (safe, read-only)
+```bash
+russh check
+```
+Reports errors and warnings in the config. Run this if connections fail
+or after config changes.
+
+### Run a command on a remote host
+```bash
+russh connect <session-name>
+```
+Opens an interactive SSH session. This is interactive and will block.
+
+To run a **non-interactive command** on a remote host, use SSH directly
+with the session details from `russh show`:
+```bash
+ssh -p <port> -i <key> <user>@<host> '<command>'
+```
+
+Or construct it from `russh show` output. Example workflow:
+```bash
+# 1. Find the host
+russh list
+
+# 2. Get connection details
+russh show dev-server
+
+# 3. Run a remote command using those details
+ssh -p 2222 -i ~/.ssh/id_ed25519 deploy@10.0.0.50 'systemctl status nginx'
+```
+
+### Add a session
+```bash
+russh insert <name> <user@host> [-p port] [-i keyfile] [-J jump-host]
+```
+Only use when the user explicitly asks to add a new session.
+
+## Config location
+
+Default: `~/.config/russh/config.toml`
+
+Override: `russh --config /path/to/config.toml <command>`
+
+## Permission boundaries
+
+| Action | Permission level |
+|--------|-----------------|
+| `russh list` | Always safe — read-only, local |
+| `russh show <name>` | Always safe — read-only, local |
+| `russh check` | Always safe — read-only, local |
+| `russh connect <name>` | Requires user approval — opens SSH session |
+| `ssh ... '<command>'` | Requires user approval — executes on remote host |
+| `russh insert ...` | Requires user approval — modifies config file |
+
+**Rule**: `list`, `show`, and `check` are free to run without asking.
+Anything that connects to a remote host or modifies config — ask first.
+
+## Typical agent workflows
+
+### Check if a service is running
+```bash
+russh show prod-web          # get connection details
+# Then ask user: "Can I run 'systemctl status nginx' on prod-web?"
+ssh -p 22 -i ~/.ssh/prod_key ubuntu@prod.example.com 'systemctl status nginx'
+```
+
+### Check disk space across hosts
+```bash
+russh list                   # discover hosts
+# For each relevant host:
+russh show <name>            # get details
+ssh <user>@<host> 'df -h'   # run with user approval
+```
+
+### Verify a deployment
+```bash
+russh show staging
+ssh admin@staging.example.com 'cat /etc/app/version.txt && systemctl is-active app'
+```
+
+### Debug connectivity
+```bash
+russh check                  # validate config first
+russh show <name>            # inspect resolved session
+# Then try: ssh -v <user>@<host> to debug
+```
+
+## Tags
+
+Sessions can have tags (e.g., `prod`, `dev`, `database`). Use `russh list`
+output to filter by tag when deciding which hosts are relevant to a task.
