@@ -1,5 +1,5 @@
 use std::fs;
-use std::io::{self, Write as _};
+use std::io::{self, IsTerminal as _, Write as _};
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
@@ -10,7 +10,8 @@ use russh_core::model::Session;
 ///
 /// When the config file is missing, the user is asked whether to create an
 /// empty one.  If they decline, an error is returned so the caller can exit
-/// cleanly.
+/// cleanly.  In non-interactive contexts (stdin is not a TTY), the prompt is
+/// skipped and an error is returned immediately.
 pub fn load_or_create_config(path: &Path) -> Result<Vec<Session>> {
     match load_config(path) {
         Ok(sessions) => Ok(sessions),
@@ -21,6 +22,11 @@ pub fn load_or_create_config(path: &Path) -> Result<Vec<Session>> {
 
 fn prompt_create_config(path: &Path) -> Result<Vec<Session>> {
     eprintln!("Config file not found: {}", path.display());
+
+    if !io::stdin().is_terminal() {
+        anyhow::bail!("no config file and stdin is not a terminal — cannot prompt for creation");
+    }
+
     eprint!("Create it now? [Y/n] ");
     io::stderr().flush()?;
 
