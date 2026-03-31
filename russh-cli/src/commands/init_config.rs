@@ -14,9 +14,7 @@ use russh_core::model::Session;
 pub fn load_or_create_config(path: &Path) -> Result<Vec<Session>> {
     match load_config(path) {
         Ok(sessions) => Ok(sessions),
-        Err(ConfigError::NotFound(_)) => {
-            prompt_create_config(path)
-        }
+        Err(ConfigError::NotFound(_)) => prompt_create_config(path),
         Err(e) => Err(e).with_context(|| format!("failed to load config: {}", path.display())),
     }
 }
@@ -39,8 +37,11 @@ fn prompt_create_config(path: &Path) -> Result<Vec<Session>> {
             .with_context(|| format!("failed to create directory: {}", parent.display()))?;
     }
 
-    fs::write(path, "# russh configuration — add sessions with `russh insert`\n")
-        .with_context(|| format!("failed to write config: {}", path.display()))?;
+    fs::write(
+        path,
+        "# russh configuration — add sessions with `russh insert`\n",
+    )
+    .with_context(|| format!("failed to write config: {}", path.display()))?;
 
     eprintln!("Created {}", path.display());
     Ok(Vec::new())

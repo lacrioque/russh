@@ -86,8 +86,21 @@ fn main() -> Result<()> {
         Command::Connect { session } => {
             commands::connect::run(&session, cli.config.as_deref())?;
         }
-        Command::Insert { name, target, port, identity, jump } => {
-            commands::insert::run(&name, &target, port, identity.as_deref(), jump.as_deref(), cli.config.as_deref())?;
+        Command::Insert {
+            name,
+            target,
+            port,
+            identity,
+            jump,
+        } => {
+            commands::insert::run(
+                &name,
+                &target,
+                port,
+                identity.as_deref(),
+                jump.as_deref(),
+                cli.config.as_deref(),
+            )?;
         }
         Command::Menu => {
             commands::menu::run(cli.config.as_deref())?;

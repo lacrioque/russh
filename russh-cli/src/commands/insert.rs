@@ -40,7 +40,10 @@ pub fn run(
             .with_context(|| format!("failed to read config: {}", config_path.display()))?;
         let key = format!("[sessions.{}]", name);
         if contents.contains(&key) {
-            bail!("session \"{name}\" already exists in {}", config_path.display());
+            bail!(
+                "session \"{name}\" already exists in {}",
+                config_path.display()
+            );
         }
     }
 
