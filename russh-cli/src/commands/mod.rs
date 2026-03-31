@@ -1,5 +1,6 @@
 pub mod check;
 pub mod connect;
+pub mod deploy;
 pub mod init_config;
 pub mod insert;
 pub mod list;

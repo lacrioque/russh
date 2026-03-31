@@ -52,6 +52,20 @@ enum Command {
         #[arg(short = 'J', long = "jump")]
         jump: Option<String>,
     },
+    /// Deploy config to remote host(s) via SCP
+    Deploy {
+        /// Session name to deploy to (omit for --all or --tag)
+        session: Option<String>,
+        /// Deploy to all configured sessions
+        #[arg(long)]
+        all: bool,
+        /// Deploy to sessions matching this tag
+        #[arg(long)]
+        tag: Option<String>,
+        /// Show what would be done without executing
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+    },
     /// Interactive menu (default when no subcommand given)
     Menu,
     /// Show version and default config path
@@ -99,6 +113,20 @@ fn main() -> Result<()> {
                 port,
                 identity.as_deref(),
                 jump.as_deref(),
+                cli.config.as_deref(),
+            )?;
+        }
+        Command::Deploy {
+            session,
+            all,
+            tag,
+            dry_run,
+        } => {
+            commands::deploy::run(
+                session.as_deref(),
+                all,
+                tag.as_deref(),
+                dry_run,
                 cli.config.as_deref(),
             )?;
         }

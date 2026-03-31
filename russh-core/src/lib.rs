@@ -3,6 +3,7 @@ pub mod model;
 pub mod paths;
 pub mod resolve;
 pub mod ssh;
+pub mod sync;
 pub mod validate;
 
 pub fn version() -> &'static str {
