@@ -2,6 +2,7 @@ pub mod config;
 pub mod model;
 pub mod paths;
 pub mod proc_config;
+pub mod proc_run;
 pub mod resolve;
 pub mod ssh;
 pub mod sync;

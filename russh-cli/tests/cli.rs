@@ -267,6 +267,93 @@ fn export_missing_config_exits_nonzero() {
         .stderr(predicate::str::contains("config file not found"));
 }
 
+// ── proc run ────────────────────────────────────────────────────────────────
+
+#[test]
+fn proc_run_unknown_procedure_exits_nonzero() {
+    let cfg = write_config(
+        r#"
+[sessions.dev]
+host = "10.0.0.1"
+username = "admin"
+"#,
+    );
+    let proc_cfg = write_config(
+        r#"
+[procedures.deploy]
+session = "dev"
+commands = ["echo hello"]
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "proc",
+            "run",
+            "nonexistent",
+            "--from-config",
+            proc_cfg.path().to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("procedure not found"));
+}
+
+#[test]
+fn proc_run_unknown_session_exits_nonzero() {
+    let cfg = write_config(
+        r#"
+[sessions.dev]
+host = "10.0.0.1"
+username = "admin"
+"#,
+    );
+    let proc_cfg = write_config(
+        r#"
+[procedures.deploy]
+session = "ghost"
+commands = ["echo hello"]
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "proc",
+            "run",
+            "deploy",
+            "--from-config",
+            proc_cfg.path().to_str().unwrap(),
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("unknown session"));
+}
+
+#[test]
+fn proc_run_missing_procedures_config_exits_nonzero() {
+    let cfg = write_config(
+        r#"
+[sessions.dev]
+host = "10.0.0.1"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "proc",
+            "run",
+            "deploy",
+            "--from-config",
+            "/nonexistent/procedures.toml",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("procedures"));
+}
+
 // ── no-subcommand (menu entry path) ──────────────────────────────────────────
 
 #[test]

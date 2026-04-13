@@ -91,10 +91,37 @@ enum Command {
     },
     /// Print the current config file contents to stdout
     Export,
+    /// Run named procedures on remote hosts
+    #[command(subcommand)]
+    Proc(ProcCommand),
     /// Interactive menu (default when no subcommand given)
     Menu,
     /// Show version and default config path
     Version,
+}
+
+#[derive(Subcommand)]
+enum ProcCommand {
+    /// Run a named procedure on a remote host
+    Run {
+        /// Procedure name (from procedures.toml)
+        name: String,
+        /// Redirect output to a log file
+        #[arg(long)]
+        log: Option<String>,
+        /// Disable pseudo-TTY allocation (overrides procedure setting)
+        #[arg(long, short = 'T')]
+        no_tty: bool,
+        /// Use an alternate procedures config file
+        #[arg(long, conflicts_with = "from_script")]
+        from_config: Option<String>,
+        /// Pipe a local script to the remote host instead of running a procedure
+        #[arg(long, conflicts_with = "from_config")]
+        from_script: Option<String>,
+        /// Session name to run the script on (required with --from-script)
+        #[arg(long, requires = "from_script")]
+        session: Option<String>,
+    },
 }
 
 fn default_config_path() -> PathBuf {
@@ -176,6 +203,26 @@ fn main() -> Result<()> {
         Command::Export => {
             commands::export::run(&config_path)?;
         }
+        Command::Proc(proc_cmd) => match proc_cmd {
+            ProcCommand::Run {
+                name,
+                log,
+                no_tty,
+                from_config,
+                from_script,
+                session,
+            } => {
+                commands::proc::run::run(
+                    &name,
+                    cli.config.as_deref(),
+                    from_config.as_deref(),
+                    from_script.as_deref(),
+                    session.as_deref(),
+                    log.as_deref(),
+                    no_tty,
+                )?;
+            }
+        },
         Command::Menu => {
             commands::menu::run(cli.config.as_deref())?;
         }

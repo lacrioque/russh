@@ -7,5 +7,6 @@ pub mod init_config;
 pub mod insert;
 pub mod list;
 pub mod menu;
+pub mod proc;
 pub mod show;
 pub mod version;
