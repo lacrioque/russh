@@ -292,3 +292,262 @@ host = "10.0.0.1"
         "expected menu path, got clap error: {stderr}"
     );
 }
+
+// ── edit ─────────────────────────────────────────────────────────────────────
+
+#[test]
+fn edit_set_port() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+username = "alice"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "foo",
+            "-p",
+            "888",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("updated"));
+
+    let content = std::fs::read_to_string(cfg.path()).unwrap();
+    assert!(content.contains("port = 888"), "port not set: {content}");
+    // Original fields preserved
+    assert!(
+        content.contains("username = \"alice\""),
+        "username lost: {content}"
+    );
+}
+
+#[test]
+fn edit_remove_port_with_none() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+port = 2222
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "foo",
+            "-p",
+            "NONE",
+        ])
+        .assert()
+        .success();
+
+    let content = std::fs::read_to_string(cfg.path()).unwrap();
+    assert!(!content.contains("port"), "port not removed: {content}");
+    assert!(
+        content.contains("host = \"10.0.0.1\""),
+        "host lost: {content}"
+    );
+}
+
+#[test]
+fn edit_remove_ssh_key_with_none() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+ssh_key = "~/.ssh/id_rsa"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "foo",
+            "-i",
+            "NONE",
+        ])
+        .assert()
+        .success();
+
+    let content = std::fs::read_to_string(cfg.path()).unwrap();
+    assert!(!content.contains("ssh_key"), "ssh_key not removed: {content}");
+}
+
+#[test]
+fn edit_nonexistent_session_fails() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "bar",
+            "-p",
+            "22",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
+}
+
+#[test]
+fn edit_no_flags_fails() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "foo",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("no fields to edit"));
+}
+
+#[test]
+fn edit_preserves_other_sessions() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+port = 22
+
+[sessions.bar]
+host = "10.0.0.2"
+username = "bob"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "foo",
+            "-p",
+            "9999",
+        ])
+        .assert()
+        .success();
+
+    let content = std::fs::read_to_string(cfg.path()).unwrap();
+    assert!(content.contains("port = 9999"), "port not updated: {content}");
+    assert!(
+        content.contains("[sessions.bar]"),
+        "other session lost: {content}"
+    );
+    assert!(
+        content.contains("username = \"bob\""),
+        "other session data lost: {content}"
+    );
+}
+
+#[test]
+fn edit_change_host_and_user() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+username = "alice"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "foo",
+            "--host",
+            "192.168.1.1",
+            "--user",
+            "deploy",
+        ])
+        .assert()
+        .success();
+
+    let content = std::fs::read_to_string(cfg.path()).unwrap();
+    assert!(
+        content.contains("host = \"192.168.1.1\""),
+        "host not updated: {content}"
+    );
+    assert!(
+        content.contains("username = \"deploy\""),
+        "user not updated: {content}"
+    );
+}
+
+#[test]
+fn edit_none_as_session_name_rejected() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "edit",
+            "NONE",
+            "-p",
+            "22",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("reserved keyword"));
+}
+
+// ── insert: NONE rejection ──────────────────────────────────────────────────
+
+#[test]
+fn insert_none_as_session_name_rejected() {
+    let cfg = write_config("[sessions]\n");
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "insert",
+            "NONE",
+            "user@host",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("reserved keyword"));
+}
+
+// ── edit: no-name opens editor (error when no $EDITOR) ──────────────────────
+
+#[test]
+fn edit_no_name_no_editor_fails() {
+    let cfg = write_config(
+        r#"
+[sessions.foo]
+host = "10.0.0.1"
+"#,
+    );
+    russh()
+        .env_remove("EDITOR")
+        .env_remove("VISUAL")
+        .args(["--config", cfg.path().to_str().unwrap(), "edit"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("EDITOR").or(predicate::str::contains("VISUAL")));
+}

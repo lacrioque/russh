@@ -24,6 +24,10 @@ pub fn run(
     jump: Option<&str>,
     config_override: Option<&str>,
 ) -> anyhow::Result<()> {
+    if name == "NONE" {
+        bail!("\"NONE\" is a reserved keyword and cannot be used as a session name");
+    }
+
     let config_path =
         paths::config_path(config_override).context("could not determine config path")?;
 

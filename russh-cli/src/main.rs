@@ -52,6 +52,29 @@ enum Command {
         #[arg(short = 'J', long = "jump")]
         jump: Option<String>,
     },
+    /// Edit an existing session (or open config in $EDITOR)
+    ///
+    /// Example: russh edit myconn -p 2222 --user deploy
+    #[command(alias = "e")]
+    Edit {
+        /// Session name (omit to open config in $EDITOR)
+        name: Option<String>,
+        /// New SSH port (use NONE to remove)
+        #[arg(short, long)]
+        port: Option<String>,
+        /// New SSH identity file path (use NONE to remove)
+        #[arg(short = 'i', long = "identity")]
+        identity: Option<String>,
+        /// New jump host session name (use NONE to remove)
+        #[arg(short = 'J', long = "jump")]
+        jump: Option<String>,
+        /// New host address
+        #[arg(long)]
+        host: Option<String>,
+        /// New SSH username (use NONE to remove)
+        #[arg(long)]
+        user: Option<String>,
+    },
     /// Deploy config to remote host(s) via SCP
     Deploy {
         /// Session name to deploy to (omit for --all or --tag)
@@ -113,6 +136,24 @@ fn main() -> Result<()> {
                 &name,
                 &target,
                 port,
+                identity.as_deref(),
+                jump.as_deref(),
+                cli.config.as_deref(),
+            )?;
+        }
+        Command::Edit {
+            name,
+            port,
+            identity,
+            jump,
+            host,
+            user,
+        } => {
+            commands::edit::run(
+                name.as_deref(),
+                host.as_deref(),
+                user.as_deref(),
+                port.as_deref(),
                 identity.as_deref(),
                 jump.as_deref(),
                 cli.config.as_deref(),
