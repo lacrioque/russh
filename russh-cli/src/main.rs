@@ -48,7 +48,7 @@ enum Command {
         /// Path to SSH identity file (private key)
         #[arg(short = 'i', long = "identity")]
         identity: Option<String>,
-        /// Jump host — name of another session to proxy through
+        /// Jump host — session name or arbitrary host (e.g. user@host:port)
         #[arg(short = 'J', long = "jump")]
         jump: Option<String>,
     },

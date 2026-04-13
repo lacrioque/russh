@@ -77,22 +77,25 @@ fn validate_jump_references(_sessions: &[ResolvedSession]) -> Vec<ValidationIssu
     vec![]
 }
 
-/// Validate raw sessions for jump host issues (missing references, circular chains).
+/// Validate raw sessions for jump host issues (circular chains, empty values).
+///
+/// Jump values that don't match a session name are treated as arbitrary host
+/// specs (e.g. `user@host:port`) and are not flagged as errors.
 pub fn validate_jump_refs_raw(sessions: &[crate::model::Session]) -> Vec<ValidationIssue> {
     let names: std::collections::HashSet<&str> = sessions.iter().map(|s| s.name.as_str()).collect();
     let mut issues = Vec::new();
 
     for session in sessions {
         if let Some(ref jump) = session.jump {
-            if !names.contains(jump.as_str()) {
+            if jump.trim().is_empty() {
                 issues.push(ValidationIssue {
                     severity: Severity::Error,
                     session_name: Some(session.name.clone()),
                     field: Some("jump".into()),
-                    message: format!("jump host \"{}\" does not exist", jump),
-                    code: Some("missing-jump-host".into()),
+                    message: "jump host must not be empty".into(),
+                    code: Some("empty-jump-host".into()),
                 });
-            } else if jump == &session.name {
+            } else if names.contains(jump.as_str()) && jump == &session.name {
                 issues.push(ValidationIssue {
                     severity: Severity::Error,
                     session_name: Some(session.name.clone()),

@@ -21,7 +21,7 @@ pub struct Session {
     /// Optional grouping/filtering labels.
     #[serde(default)]
     pub tags: Vec<String>,
-    /// Optional jump host — name of another session to proxy through.
+    /// Optional jump host — session name or arbitrary host spec (e.g. `user@host:port`).
     pub jump: Option<String>,
 }
 

@@ -9,19 +9,25 @@ const DEFAULT_PORT: u16 = 22;
 ///
 /// If the session has a `jump` field referencing another session name, that session
 /// is resolved and its `user@host:port` string is stored in `jump_target`.
+/// If the `jump` value does not match any session name, it is treated as an
+/// arbitrary host spec (e.g. `user@host:port`) and passed through directly.
 ///
 /// Use this when you have the full session list available. Falls back to
 /// [`resolve_session`] for sessions without a jump host.
 pub fn resolve_session_with_jump(session: &Session, all_sessions: &[Session]) -> ResolvedSession {
     let mut resolved = resolve_session(session);
 
-    if let Some(ref jump_name) = session.jump {
-        if let Some(jump_session) = all_sessions.iter().find(|s| s.name == *jump_name) {
+    if let Some(ref jump_value) = session.jump {
+        if let Some(jump_session) = all_sessions.iter().find(|s| s.name == *jump_value) {
+            // Jump value matches a session name — resolve it
             let jump_resolved = resolve_session(jump_session);
             resolved.jump_target = Some(format!(
                 "{}@{}:{}",
                 jump_resolved.username, jump_resolved.host, jump_resolved.port
             ));
+        } else {
+            // Not a session name — treat as arbitrary host spec (passed directly to ssh -J)
+            resolved.jump_target = Some(jump_value.clone());
         }
     }
 
@@ -273,5 +279,73 @@ mod tests {
             assert_eq!(r.ssh_key.as_deref(), Some("/home/testuser"));
             assert_eq!(r.key_source, KeySource::Explicit);
         });
+    }
+
+    #[test]
+    fn jump_resolves_session_name() {
+        let bastion = make_session(|s| {
+            s.name = "bastion".into();
+            s.host = "10.0.0.1".into();
+            s.username = Some("ops".into());
+            s.port = Some(2222);
+        });
+        let target = make_session(|s| {
+            s.name = "internal".into();
+            s.host = "10.0.1.5".into();
+            s.jump = Some("bastion".into());
+        });
+        let sessions = vec![bastion, target.clone()];
+        let resolved = resolve_session_with_jump(&target, &sessions);
+        assert_eq!(resolved.jump_target, Some("ops@10.0.0.1:2222".into()));
+    }
+
+    #[test]
+    fn jump_arbitrary_host_passthrough() {
+        let target = make_session(|s| {
+            s.jump = Some("admin@jumpbox.example.com:2222".into());
+        });
+        let resolved = resolve_session_with_jump(&target, &[]);
+        assert_eq!(
+            resolved.jump_target,
+            Some("admin@jumpbox.example.com:2222".into())
+        );
+    }
+
+    #[test]
+    fn jump_arbitrary_host_without_user() {
+        let target = make_session(|s| {
+            s.jump = Some("jumpbox.example.com".into());
+        });
+        let resolved = resolve_session_with_jump(&target, &[]);
+        assert_eq!(
+            resolved.jump_target,
+            Some("jumpbox.example.com".into())
+        );
+    }
+
+    #[test]
+    fn jump_prefers_session_name_over_passthrough() {
+        let bastion = make_session(|s| {
+            s.name = "bastion".into();
+            s.host = "10.0.0.1".into();
+            s.username = Some("ops".into());
+            s.port = Some(22);
+        });
+        let target = make_session(|s| {
+            s.jump = Some("bastion".into());
+        });
+        let sessions = vec![bastion, target.clone()];
+        let resolved = resolve_session_with_jump(&target, &sessions);
+        // Should resolve via the session, not pass through "bastion" literally
+        assert_eq!(resolved.jump_target, Some("ops@10.0.0.1:22".into()));
+    }
+
+    #[test]
+    fn jump_none_gives_no_target() {
+        let target = make_session(|s| {
+            s.jump = None;
+        });
+        let resolved = resolve_session_with_jump(&target, &[]);
+        assert!(resolved.jump_target.is_none());
     }
 }
