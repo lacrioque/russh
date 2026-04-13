@@ -290,10 +290,10 @@ commands = ["echo hello"]
             "--config",
             cfg.path().to_str().unwrap(),
             "proc",
-            "run",
-            "nonexistent",
             "--from-config",
             proc_cfg.path().to_str().unwrap(),
+            "run",
+            "nonexistent",
         ])
         .assert()
         .failure()
@@ -321,10 +321,10 @@ commands = ["echo hello"]
             "--config",
             cfg.path().to_str().unwrap(),
             "proc",
-            "run",
-            "deploy",
             "--from-config",
             proc_cfg.path().to_str().unwrap(),
+            "run",
+            "deploy",
         ])
         .assert()
         .failure()
@@ -344,14 +344,211 @@ host = "10.0.0.1"
             "--config",
             cfg.path().to_str().unwrap(),
             "proc",
-            "run",
-            "deploy",
             "--from-config",
             "/nonexistent/procedures.toml",
+            "run",
+            "deploy",
         ])
         .assert()
         .failure()
         .stderr(predicate::str::contains("procedures"));
+}
+
+// ── proc list ────────────────────────────────────────────────────────────────
+
+#[test]
+fn proc_list_shows_all_procedures() {
+    russh()
+        .args(["proc", "--from-config", &fixture("procedures.toml"), "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("backup"))
+        .stdout(predicate::str::contains("deploy"))
+        .stdout(predicate::str::contains("healthcheck"));
+}
+
+#[test]
+fn proc_list_shows_table_headers() {
+    russh()
+        .args(["proc", "--from-config", &fixture("procedures.toml"), "list"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("NAME"))
+        .stdout(predicate::str::contains("SESSION"))
+        .stdout(predicate::str::contains("DESCRIPTION"))
+        .stdout(predicate::str::contains("TAGS"));
+}
+
+#[test]
+fn proc_list_empty_config_prints_no_procedures() {
+    let cfg = write_config("[procedures]\n");
+    russh()
+        .args([
+            "proc",
+            "--from-config",
+            cfg.path().to_str().unwrap(),
+            "list",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("No procedures configured"));
+}
+
+#[test]
+fn proc_list_missing_config_exits_nonzero() {
+    russh()
+        .args([
+            "proc",
+            "--from-config",
+            "/nonexistent/path/procedures.toml",
+            "list",
+        ])
+        .assert()
+        .failure();
+}
+
+// ── proc show ────────────────────────────────────────────────────────────────
+
+#[test]
+fn proc_show_known_procedure_displays_details() {
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "proc",
+            "--from-config",
+            &fixture("procedures.toml"),
+            "show",
+            "backup",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("backup"))
+        .stdout(predicate::str::contains("alpha"))
+        .stdout(predicate::str::contains("Run daily backup script"));
+}
+
+#[test]
+fn proc_show_displays_commands() {
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "proc",
+            "--from-config",
+            &fixture("procedures.toml"),
+            "show",
+            "backup",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("cd /opt/backup"))
+        .stdout(predicate::str::contains("./run-backup.sh"));
+}
+
+#[test]
+fn proc_show_displays_resolved_session() {
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "proc",
+            "--from-config",
+            &fixture("procedures.toml"),
+            "show",
+            "backup",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Resolved session"))
+        .stdout(predicate::str::contains("10.0.0.1"));
+}
+
+#[test]
+fn proc_show_displays_ssh_command_preview() {
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "proc",
+            "--from-config",
+            &fixture("procedures.toml"),
+            "show",
+            "backup",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("SSH command preview"))
+        .stdout(predicate::str::contains("ssh"));
+}
+
+#[test]
+fn proc_show_unknown_procedure_exits_nonzero() {
+    russh()
+        .args([
+            "proc",
+            "--from-config",
+            &fixture("procedures.toml"),
+            "show",
+            "nosuchproc",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nosuchproc"));
+}
+
+// ── proc check ───────────────────────────────────────────────────────────────
+
+#[test]
+fn proc_check_clean_config_exits_zero() {
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "proc",
+            "--from-config",
+            &fixture("procedures.toml"),
+            "check",
+        ])
+        .assert()
+        .code(0)
+        .stdout(predicate::str::contains("OK"));
+}
+
+#[test]
+fn proc_check_missing_session_ref_exits_two() {
+    let cfg = write_config(
+        r#"
+[procedures.broken]
+session = "nonexistent"
+commands = ["echo hello"]
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "proc",
+            "--from-config",
+            cfg.path().to_str().unwrap(),
+            "check",
+        ])
+        .assert()
+        .code(2)
+        .stdout(predicate::str::contains("Error"));
+}
+
+#[test]
+fn proc_check_missing_config_exits_two() {
+    russh()
+        .args([
+            "proc",
+            "--from-config",
+            "/nonexistent/procedures.toml",
+            "check",
+        ])
+        .assert()
+        .code(2);
 }
 
 // ── no-subcommand (menu entry path) ──────────────────────────────────────────

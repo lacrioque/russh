@@ -91,9 +91,15 @@ enum Command {
     },
     /// Print the current config file contents to stdout
     Export,
-    /// Run named procedures on remote hosts
-    #[command(subcommand)]
-    Proc(ProcCommand),
+    /// Manage procedures (named command sequences on remote hosts)
+    Proc {
+        /// Path to procedures config file (overrides default location)
+        #[arg(long = "from-config")]
+        from_config: Option<String>,
+
+        #[command(subcommand)]
+        action: ProcCommand,
+    },
     /// Interactive menu (default when no subcommand given)
     Menu,
     /// Show version and default config path
@@ -102,6 +108,15 @@ enum Command {
 
 #[derive(Subcommand)]
 enum ProcCommand {
+    /// List all configured procedures
+    List,
+    /// Show details of a named procedure
+    Show {
+        /// Procedure name
+        name: String,
+    },
+    /// Validate all procedures and report issues
+    Check,
     /// Run a named procedure on a remote host
     Run {
         /// Procedure name (from procedures.toml)
@@ -112,11 +127,8 @@ enum ProcCommand {
         /// Disable pseudo-TTY allocation (overrides procedure setting)
         #[arg(long, short = 'T')]
         no_tty: bool,
-        /// Use an alternate procedures config file
-        #[arg(long, conflicts_with = "from_script")]
-        from_config: Option<String>,
         /// Pipe a local script to the remote host instead of running a procedure
-        #[arg(long, conflicts_with = "from_config")]
+        #[arg(long)]
         from_script: Option<String>,
         /// Session name to run the script on (required with --from-script)
         #[arg(long, requires = "from_script")]
@@ -203,12 +215,27 @@ fn main() -> Result<()> {
         Command::Export => {
             commands::export::run(&config_path)?;
         }
-        Command::Proc(proc_cmd) => match proc_cmd {
+        Command::Proc {
+            from_config,
+            action,
+        } => match action {
+            ProcCommand::List => {
+                commands::proc::list::run(from_config.as_deref())?;
+            }
+            ProcCommand::Show { name } => {
+                commands::proc::show::run(
+                    &name,
+                    from_config.as_deref(),
+                    cli.config.as_deref(),
+                )?;
+            }
+            ProcCommand::Check => {
+                commands::proc::check::run(from_config.as_deref(), cli.config.as_deref());
+            }
             ProcCommand::Run {
                 name,
                 log,
                 no_tty,
-                from_config,
                 from_script,
                 session,
             } => {

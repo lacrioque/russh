@@ -1,0 +1,16 @@
+[procedures.backup]
+session = "alpha"
+description = "Run daily backup script"
+commands = ["cd /opt/backup", "./run-backup.sh"]
+tags = ["ops", "daily"]
+
+[procedures.deploy]
+session = "bravo"
+description = "Deploy latest release"
+commands = ["cd /app", "git pull origin main", "systemctl restart app"]
+tags = ["ops"]
+
+[procedures.healthcheck]
+session = "charlie"
+description = "Quick health check"
+commands = ["uptime", "df -h", "free -m"]
