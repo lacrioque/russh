@@ -8,8 +8,8 @@ pub fn run(config_override: Option<&str>) -> anyhow::Result<()> {
         .or_else(|_| std::env::var("VISUAL"))
         .map_err(|_| anyhow::anyhow!("no editor set — set $EDITOR or $VISUAL"))?;
 
-    let config_path =
-        paths::procedures_path(config_override).context("could not determine procedures config path")?;
+    let config_path = paths::procedures_path(config_override)
+        .context("could not determine procedures config path")?;
 
     if !config_path.exists() {
         bail!(

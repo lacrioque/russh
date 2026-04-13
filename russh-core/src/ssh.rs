@@ -354,11 +354,8 @@ mod tests {
 
     #[test]
     fn procedure_command_appends_shell_command() {
-        let spec = build_procedure_command(
-            &make_resolved(|_| {}),
-            "echo hello && echo world",
-            false,
-        );
+        let spec =
+            build_procedure_command(&make_resolved(|_| {}), "echo hello && echo world", false);
         assert_eq!(spec.args.last().unwrap(), "echo hello && echo world");
     }
 
@@ -391,7 +388,10 @@ mod tests {
         assert!(t_idx < p_idx, "-T must come before -p");
         assert!(p_idx < i_idx, "-p must come before -i");
         assert!(i_idx < dest_idx, "-i must come before destination");
-        assert!(dest_idx < cmd_idx, "destination must come before shell command");
+        assert!(
+            dest_idx < cmd_idx,
+            "destination must come before shell command"
+        );
     }
 
     #[test]
@@ -518,10 +518,7 @@ mod tests {
         assert!(status.success());
 
         let content = std::fs::read_to_string(&log_path).unwrap();
-        assert!(
-            content.contains("hello from ssh"),
-            "log content: {content}"
-        );
+        assert!(content.contains("hello from ssh"), "log content: {content}");
 
         std::fs::remove_dir_all(&dir).ok();
     }
@@ -543,10 +540,7 @@ mod tests {
         assert!(status.success());
 
         let content = std::fs::read_to_string(&output_path).unwrap();
-        assert!(
-            content.contains("piped input"),
-            "output content: {content}"
-        );
+        assert!(content.contains("piped input"), "output content: {content}");
 
         std::fs::remove_dir_all(&dir).ok();
     }

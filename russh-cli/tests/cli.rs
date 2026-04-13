@@ -661,7 +661,10 @@ ssh_key = "~/.ssh/id_rsa"
         .success();
 
     let content = std::fs::read_to_string(cfg.path()).unwrap();
-    assert!(!content.contains("ssh_key"), "ssh_key not removed: {content}");
+    assert!(
+        !content.contains("ssh_key"),
+        "ssh_key not removed: {content}"
+    );
 }
 
 #[test]
@@ -695,12 +698,7 @@ host = "10.0.0.1"
 "#,
     );
     russh()
-        .args([
-            "--config",
-            cfg.path().to_str().unwrap(),
-            "edit",
-            "foo",
-        ])
+        .args(["--config", cfg.path().to_str().unwrap(), "edit", "foo"])
         .assert()
         .failure()
         .stderr(predicate::str::contains("no fields to edit"));
@@ -732,7 +730,10 @@ username = "bob"
         .success();
 
     let content = std::fs::read_to_string(cfg.path()).unwrap();
-    assert!(content.contains("port = 9999"), "port not updated: {content}");
+    assert!(
+        content.contains("port = 9999"),
+        "port not updated: {content}"
+    );
     assert!(
         content.contains("[sessions.bar]"),
         "other session lost: {content}"

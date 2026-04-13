@@ -253,11 +253,7 @@ fn main() -> Result<()> {
                 commands::proc::list::run(from_config.as_deref())?;
             }
             ProcCommand::Show { name } => {
-                commands::proc::show::run(
-                    &name,
-                    from_config.as_deref(),
-                    cli.config.as_deref(),
-                )?;
+                commands::proc::show::run(&name, from_config.as_deref(), cli.config.as_deref())?;
             }
             ProcCommand::Check => {
                 commands::proc::check::run(from_config.as_deref(), cli.config.as_deref());

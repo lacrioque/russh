@@ -144,10 +144,7 @@ pub fn validate_procedure(
             session_name: None,
             procedure_name: Some(procedure.name.clone()),
             field: Some("session".into()),
-            message: format!(
-                "session \"{}\" does not exist",
-                procedure.session
-            ),
+            message: format!("session \"{}\" does not exist", procedure.session),
             code: Some("unknown-session".into()),
         });
     }
@@ -477,8 +474,12 @@ mod tests {
         ];
         let issues = validate_procedures(&procs, &names);
         assert!(issues.len() >= 2);
-        assert!(issues.iter().any(|i| i.code.as_deref() == Some("unknown-session")));
-        assert!(issues.iter().any(|i| i.code.as_deref() == Some("empty-commands")));
+        assert!(issues
+            .iter()
+            .any(|i| i.code.as_deref() == Some("unknown-session")));
+        assert!(issues
+            .iter()
+            .any(|i| i.code.as_deref() == Some("empty-commands")));
     }
 
     #[test]
@@ -494,7 +495,10 @@ mod tests {
             &session_names_set(),
         );
         let display = format!("{}", issues[0]);
-        assert!(display.contains("procedure \"deploy\""), "display: {display}");
+        assert!(
+            display.contains("procedure \"deploy\""),
+            "display: {display}"
+        );
         assert!(display.contains("empty-commands"), "display: {display}");
     }
 }

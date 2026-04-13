@@ -26,10 +26,7 @@ pub struct ExecutableProcedure {
 /// Resolve a procedure by looking up its session in the session list.
 ///
 /// Returns `None` if the referenced session does not exist.
-pub fn resolve_procedure(
-    proc: &Procedure,
-    sessions: &[Session],
-) -> Option<ExecutableProcedure> {
+pub fn resolve_procedure(proc: &Procedure, sessions: &[Session]) -> Option<ExecutableProcedure> {
     let session = sessions.iter().find(|s| s.name == proc.session)?;
     let resolved = resolve_session_with_jump(session, sessions);
     Some(ExecutableProcedure {
@@ -51,10 +48,7 @@ pub fn resolve_procedure(
 /// Checks that the procedure references an existing session.
 /// (Empty commands and missing session are already caught by `proc_config`
 /// at parse time, but we guard here too for defense in depth.)
-pub fn validate_procedure(
-    proc: &Procedure,
-    sessions: &[Session],
-) -> Vec<ValidationIssue> {
+pub fn validate_procedure(proc: &Procedure, sessions: &[Session]) -> Vec<ValidationIssue> {
     let mut issues = Vec::new();
 
     if proc.commands.is_empty() {
@@ -336,7 +330,9 @@ mod tests {
     fn validate_unknown_session() {
         let proc = make_proc("bad", "ghost", vec!["echo hi"]);
         let issues = validate_procedure(&proc, &make_sessions());
-        assert!(issues.iter().any(|i| i.code.as_deref() == Some("unknown-session")));
+        assert!(issues
+            .iter()
+            .any(|i| i.code.as_deref() == Some("unknown-session")));
     }
 
     #[test]
@@ -344,7 +340,9 @@ mod tests {
         let mut proc = make_proc("empty", "prod", vec![]);
         proc.commands.clear();
         let issues = validate_procedure(&proc, &make_sessions());
-        assert!(issues.iter().any(|i| i.code.as_deref() == Some("empty-commands")));
+        assert!(issues
+            .iter()
+            .any(|i| i.code.as_deref() == Some("empty-commands")));
     }
 
     // --- Command building ---

@@ -27,8 +27,7 @@ pub fn run(
 
     // Handle --from-script mode: pipe a local script to a session
     if let Some(script_path) = from_script {
-        let session_name = script_session
-            .context("--from-script requires --session <name>")?;
+        let session_name = script_session.context("--from-script requires --session <name>")?;
 
         let session = sessions
             .iter()

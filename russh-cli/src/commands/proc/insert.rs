@@ -27,8 +27,8 @@ pub fn run(
         bail!("at least one command is required (-c 'command')");
     }
 
-    let config_path =
-        paths::procedures_path(config_override).context("could not determine procedures config path")?;
+    let config_path = paths::procedures_path(config_override)
+        .context("could not determine procedures config path")?;
 
     // Check for duplicate procedure name
     if config_path.exists() {
@@ -83,11 +83,7 @@ pub fn run(
     file.write_all(block.as_bytes())
         .with_context(|| "failed to write procedure to config")?;
 
-    println!(
-        "Procedure \"{}\" added to {}",
-        name,
-        config_path.display()
-    );
+    println!("Procedure \"{}\" added to {}", name, config_path.display());
     println!("  Session:     {}", session);
     println!("  Commands:    {}", commands.len());
     for cmd in commands {

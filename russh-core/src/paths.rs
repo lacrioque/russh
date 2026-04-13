@@ -252,10 +252,7 @@ mod tests {
             &[("HOME", Some("/fakehome")), ("XDG_CONFIG_HOME", None)],
             || {
                 let p = procedures_path(None).unwrap();
-                assert_eq!(
-                    p,
-                    PathBuf::from("/fakehome/.config/russh/procedures.toml")
-                );
+                assert_eq!(p, PathBuf::from("/fakehome/.config/russh/procedures.toml"));
             },
         );
     }
@@ -280,10 +277,7 @@ mod tests {
             &[("HOME", Some("/fakehome")), ("XDG_CONFIG_HOME", Some(""))],
             || {
                 let p = procedures_path(None).unwrap();
-                assert_eq!(
-                    p,
-                    PathBuf::from("/fakehome/.config/russh/procedures.toml")
-                );
+                assert_eq!(p, PathBuf::from("/fakehome/.config/russh/procedures.toml"));
             },
         );
     }

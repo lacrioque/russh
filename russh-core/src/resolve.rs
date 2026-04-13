@@ -348,10 +348,7 @@ mod tests {
             s.jump = Some("jumpbox.example.com".into());
         });
         let resolved = resolve_session_with_jump(&target, &[]);
-        assert_eq!(
-            resolved.jump_target,
-            Some("jumpbox.example.com".into())
-        );
+        assert_eq!(resolved.jump_target, Some("jumpbox.example.com".into()));
     }
 
     #[test]
@@ -451,7 +448,12 @@ mod tests {
     fn resolve_procedure_normalizes_tags() {
         let sessions = default_sessions();
         let proc = make_procedure(|p| {
-            p.tags = vec![" deploy ".into(), "prod".into(), "deploy".into(), "  ".into()];
+            p.tags = vec![
+                " deploy ".into(),
+                "prod".into(),
+                "deploy".into(),
+                "  ".into(),
+            ];
         });
         let resolved = resolve_procedure(&proc, &sessions).unwrap();
         assert_eq!(resolved.tags, vec!["deploy", "prod"]);

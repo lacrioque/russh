@@ -27,11 +27,7 @@ pub fn run(config_override: Option<&str>) -> Result<()> {
         .map(|p| Row {
             name: p.name.clone(),
             session: p.session.clone(),
-            description: p
-                .description
-                .as_deref()
-                .unwrap_or("(none)")
-                .to_string(),
+            description: p.description.as_deref().unwrap_or("(none)").to_string(),
             tags: if p.tags.is_empty() {
                 String::new()
             } else {

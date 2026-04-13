@@ -20,10 +20,7 @@ pub enum ProcConfigError {
 
     /// A procedure is missing a required field or has invalid data.
     #[error("procedure \"{procedure}\": {message}")]
-    ValidationError {
-        procedure: String,
-        message: String,
-    },
+    ValidationError { procedure: String, message: String },
 }
 
 /// Top-level TOML structure: `[procedures.<name>]` tables.
@@ -141,7 +138,10 @@ commands = ["echo hi"]
 "#;
         let err = parse_procedures(toml).unwrap_err();
         let msg = err.to_string();
-        assert!(msg.contains("missing"), "expected missing field error: {msg}");
+        assert!(
+            msg.contains("missing"),
+            "expected missing field error: {msg}"
+        );
     }
 
     #[test]
@@ -182,10 +182,7 @@ session = "dev"
 "#;
         let err = parse_procedures(toml).unwrap_err();
         // TOML deserialization should fail for missing required field
-        assert!(matches!(
-            err,
-            ProcConfigError::ParseError(_)
-        ));
+        assert!(matches!(err, ProcConfigError::ParseError(_)));
     }
 
     #[test]
