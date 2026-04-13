@@ -134,6 +134,36 @@ enum ProcCommand {
         #[arg(long, requires = "from_script")]
         session: Option<String>,
     },
+    /// Insert a new procedure into the config
+    Insert {
+        /// Procedure name
+        name: String,
+        /// Session name to execute on
+        #[arg(long)]
+        session: String,
+        /// Commands to execute (repeat for multiple)
+        #[arg(short = 'c', long = "command")]
+        commands: Vec<String>,
+        /// Human-readable description
+        #[arg(long)]
+        description: Option<String>,
+        /// Disable pseudo-TTY allocation
+        #[arg(long)]
+        no_tty: bool,
+        /// Disable fail-fast (run all commands regardless of failures)
+        #[arg(long)]
+        no_fail_fast: bool,
+    },
+    /// Open the procedures config in $EDITOR
+    Edit,
+    /// Export procedures as TOML or standalone shell script
+    Export {
+        /// Procedure name (omit for all)
+        name: Option<String>,
+        /// Emit a standalone shell script instead of TOML
+        #[arg(long)]
+        script: bool,
+    },
 }
 
 fn default_config_path() -> PathBuf {
@@ -247,6 +277,35 @@ fn main() -> Result<()> {
                     session.as_deref(),
                     log.as_deref(),
                     no_tty,
+                )?;
+            }
+            ProcCommand::Insert {
+                name,
+                session,
+                commands: cmds,
+                description,
+                no_tty,
+                no_fail_fast,
+            } => {
+                commands::proc::insert::run(
+                    &name,
+                    &session,
+                    &cmds,
+                    description.as_deref(),
+                    no_tty,
+                    no_fail_fast,
+                    from_config.as_deref(),
+                )?;
+            }
+            ProcCommand::Edit => {
+                commands::proc::edit::run(from_config.as_deref())?;
+            }
+            ProcCommand::Export { name, script } => {
+                commands::proc::export::run(
+                    name.as_deref(),
+                    script,
+                    from_config.as_deref(),
+                    cli.config.as_deref(),
                 )?;
             }
         },
