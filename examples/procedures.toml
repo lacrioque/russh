@@ -1,0 +1,37 @@
+# Example procedures configuration for russh.
+#
+# Each procedure defines a named sequence of commands to run on a remote session.
+# Place this file at ~/.config/russh/procedures.toml (or set XDG_CONFIG_HOME).
+
+[procedures.deploy]
+session = "prod"
+commands = [
+    "systemctl stop myapp",
+    "rsync -avz /local/build/ /opt/myapp/",
+    "systemctl start myapp",
+]
+description = "Deploy the application to production"
+tags = ["deploy", "prod"]
+# fail_fast = true   (default: stop on first failure)
+# no_tty = false     (default: allocate TTY)
+
+[procedures.backup]
+session = "db"
+commands = [
+    "pg_dump -Fc mydb > /tmp/mydb_$(date +%Y%m%d).dump",
+    "aws s3 cp /tmp/mydb_*.dump s3://backups/",
+]
+description = "Backup the database and upload to S3"
+no_tty = true
+tags = ["backup", "ops"]
+
+[procedures.health-check]
+session = "prod"
+commands = [
+    "systemctl is-active myapp",
+    "curl -sf http://localhost:8080/health",
+    "df -h /",
+]
+description = "Quick health check on production"
+fail_fast = false
+tags = ["monitoring"]

@@ -68,6 +68,58 @@ pub struct ResolvedSession {
     pub jump_target: Option<String>,
 }
 
+/// Raw procedure as deserialized from TOML config.
+///
+/// A procedure is a named sequence of commands to run on a remote session.
+/// Optional fields are `None` or use defaults when not specified.
+/// Use the resolve module to produce a [`ResolvedProcedure`] with defaults applied.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Procedure {
+    /// Unique identifier (derived from the TOML table key, not deserialized directly).
+    #[serde(skip)]
+    pub name: String,
+    /// Session name to run the commands on (required).
+    pub session: String,
+    /// List of shell commands to execute in order (required, must be non-empty).
+    pub commands: Vec<String>,
+    /// Human-readable description of what this procedure does.
+    pub description: Option<String>,
+    /// If true, disable TTY allocation for the SSH session.
+    #[serde(default)]
+    pub no_tty: bool,
+    /// If true, stop on the first command that fails. Defaults to true.
+    #[serde(default = "default_true")]
+    pub fail_fast: bool,
+    /// Optional grouping/filtering labels.
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+/// A procedure with all defaults resolved.
+///
+/// Every field is explicit — no further inference needed downstream.
+#[derive(Debug, Clone)]
+pub struct ResolvedProcedure {
+    /// Procedure name.
+    pub name: String,
+    /// Session name to run on.
+    pub session: String,
+    /// Commands to execute.
+    pub commands: Vec<String>,
+    /// Description (empty string if not provided).
+    pub description: String,
+    /// Whether to disable TTY allocation.
+    pub no_tty: bool,
+    /// Whether to stop on first failure.
+    pub fail_fast: bool,
+    /// Tags for grouping and filtering.
+    pub tags: Vec<String>,
+}
+
 /// Severity of a validation finding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Severity {
@@ -289,5 +341,64 @@ mod tests {
         assert_eq!(c.name, r.name);
         assert_eq!(c.key_source, r.key_source);
         assert_eq!(c.tags, r.tags);
+    }
+
+    // --- Procedure ---
+
+    #[test]
+    fn procedure_fail_fast_defaults_to_true() {
+        let toml = r#"
+            session = "dev"
+            commands = ["echo hi"]
+        "#;
+        let p: Procedure = toml::from_str(toml).unwrap();
+        assert!(p.fail_fast);
+    }
+
+    #[test]
+    fn procedure_no_tty_defaults_to_false() {
+        let toml = r#"
+            session = "dev"
+            commands = ["echo hi"]
+        "#;
+        let p: Procedure = toml::from_str(toml).unwrap();
+        assert!(!p.no_tty);
+    }
+
+    #[test]
+    fn procedure_clone_is_independent() {
+        let p = Procedure {
+            name: "deploy".into(),
+            session: "prod".into(),
+            commands: vec!["systemctl restart app".into()],
+            description: Some("Deploy the app".into()),
+            no_tty: false,
+            fail_fast: true,
+            tags: vec!["deploy".into()],
+        };
+        let mut c = p.clone();
+        c.name = "other".into();
+        assert_eq!(p.name, "deploy");
+    }
+
+    // --- ResolvedProcedure ---
+
+    #[test]
+    fn resolved_procedure_clone() {
+        let r = ResolvedProcedure {
+            name: "backup".into(),
+            session: "db".into(),
+            commands: vec!["pg_dump ...".into()],
+            description: "Run backup".into(),
+            no_tty: true,
+            fail_fast: false,
+            tags: vec!["ops".into()],
+        };
+        let c = r.clone();
+        assert_eq!(c.name, r.name);
+        assert_eq!(c.session, r.session);
+        assert_eq!(c.commands, r.commands);
+        assert_eq!(c.no_tty, r.no_tty);
+        assert_eq!(c.fail_fast, r.fail_fast);
     }
 }

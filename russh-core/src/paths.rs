@@ -26,6 +26,31 @@ pub fn config_path(override_path: Option<&str>) -> Option<PathBuf> {
     Some(config_dir.join("russh").join("config.toml"))
 }
 
+/// Returns the default procedures file path.
+///
+/// Resolution order:
+/// 1. `XDG_CONFIG_HOME/russh/procedures.toml` (if `XDG_CONFIG_HOME` is set)
+/// 2. `~/.config/russh/procedures.toml`
+///
+/// If `override_path` is `Some`, it is returned directly (after tilde expansion).
+pub fn procedures_path(override_path: Option<&str>) -> Option<PathBuf> {
+    if let Some(p) = override_path {
+        return Some(PathBuf::from(expand_tilde(p)));
+    }
+
+    let config_dir = if let Ok(xdg) = env::var("XDG_CONFIG_HOME") {
+        if xdg.is_empty() {
+            default_config_dir()?
+        } else {
+            PathBuf::from(xdg)
+        }
+    } else {
+        default_config_dir()?
+    };
+
+    Some(config_dir.join("russh").join("procedures.toml"))
+}
+
 /// Returns `~/.config` using the home directory, or `None` if unavailable.
 fn default_config_dir() -> Option<PathBuf> {
     home_dir().map(|h| h.join(".config"))
@@ -199,6 +224,66 @@ mod tests {
             || {
                 let p = config_path(None).unwrap();
                 assert_eq!(p, PathBuf::from("/fakehome/.config/russh/config.toml"));
+            },
+        );
+    }
+
+    // --- procedures_path ---
+
+    #[test]
+    fn procedures_path_override() {
+        let p = procedures_path(Some("~/procs.toml")).unwrap();
+        assert!(p.is_absolute(), "expected absolute path, got: {p:?}");
+        assert!(
+            p.ends_with("procs.toml"),
+            "expected path ending in procs.toml, got: {p:?}"
+        );
+    }
+
+    #[test]
+    fn procedures_path_override_absolute() {
+        let p = procedures_path(Some("/etc/procs.toml")).unwrap();
+        assert_eq!(p, PathBuf::from("/etc/procs.toml"));
+    }
+
+    #[test]
+    fn procedures_path_default() {
+        with_env(
+            &[("HOME", Some("/fakehome")), ("XDG_CONFIG_HOME", None)],
+            || {
+                let p = procedures_path(None).unwrap();
+                assert_eq!(
+                    p,
+                    PathBuf::from("/fakehome/.config/russh/procedures.toml")
+                );
+            },
+        );
+    }
+
+    #[test]
+    fn procedures_path_xdg() {
+        with_env(
+            &[
+                ("HOME", Some("/fakehome")),
+                ("XDG_CONFIG_HOME", Some("/xdgdir")),
+            ],
+            || {
+                let p = procedures_path(None).unwrap();
+                assert_eq!(p, PathBuf::from("/xdgdir/russh/procedures.toml"));
+            },
+        );
+    }
+
+    #[test]
+    fn procedures_path_xdg_empty_falls_back() {
+        with_env(
+            &[("HOME", Some("/fakehome")), ("XDG_CONFIG_HOME", Some(""))],
+            || {
+                let p = procedures_path(None).unwrap();
+                assert_eq!(
+                    p,
+                    PathBuf::from("/fakehome/.config/russh/procedures.toml")
+                );
             },
         );
     }
