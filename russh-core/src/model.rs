@@ -25,6 +25,60 @@ pub struct Session {
     pub jump: Option<String>,
 }
 
+/// Helper for `fail_fast` default — serde requires a function path.
+fn default_true() -> bool {
+    true
+}
+
+/// Raw procedure as deserialized from TOML config.
+///
+/// Represents a named sequence of shell commands to execute on a remote host.
+/// Use the resolve module to produce a [`ResolvedProcedure`] with the session
+/// resolved and commands joined.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Procedure {
+    /// Unique identifier (derived from the TOML table key, not deserialized directly).
+    #[serde(skip)]
+    pub name: String,
+    /// Name of the session (from config.toml) to execute on.
+    pub session: String,
+    /// Shell commands to execute in order.
+    pub commands: Vec<String>,
+    /// Human-readable description.
+    pub description: Option<String>,
+    /// If true, disable TTY allocation (ssh -T). Defaults to false.
+    #[serde(default)]
+    pub no_tty: bool,
+    /// If true, join commands with `&&` (stop on first failure).
+    /// If false, join with `;` (run all regardless). Defaults to true.
+    #[serde(default = "default_true")]
+    pub fail_fast: bool,
+    /// Optional grouping/filtering labels.
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+/// A procedure with its session resolved and commands joined into a shell command.
+#[derive(Debug, Clone)]
+pub struct ResolvedProcedure {
+    /// Procedure name.
+    pub name: String,
+    /// The fully resolved session to execute on.
+    pub session: ResolvedSession,
+    /// Original command list.
+    pub commands: Vec<String>,
+    /// Commands joined with `&&` or `;` depending on `fail_fast`.
+    pub shell_command: String,
+    /// Human-readable description.
+    pub description: Option<String>,
+    /// Whether TTY allocation is disabled.
+    pub no_tty: bool,
+    /// Whether to stop on first command failure.
+    pub fail_fast: bool,
+    /// Tags for grouping and filtering.
+    pub tags: Vec<String>,
+}
+
 /// Where the SSH key came from after resolution.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeySource {
@@ -68,58 +122,6 @@ pub struct ResolvedSession {
     pub jump_target: Option<String>,
 }
 
-/// Raw procedure as deserialized from TOML config.
-///
-/// A procedure is a named sequence of commands to run on a remote session.
-/// Optional fields are `None` or use defaults when not specified.
-/// Use the resolve module to produce a [`ResolvedProcedure`] with defaults applied.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Procedure {
-    /// Unique identifier (derived from the TOML table key, not deserialized directly).
-    #[serde(skip)]
-    pub name: String,
-    /// Session name to run the commands on (required).
-    pub session: String,
-    /// List of shell commands to execute in order (required, must be non-empty).
-    pub commands: Vec<String>,
-    /// Human-readable description of what this procedure does.
-    pub description: Option<String>,
-    /// If true, disable TTY allocation for the SSH session.
-    #[serde(default)]
-    pub no_tty: bool,
-    /// If true, stop on the first command that fails. Defaults to true.
-    #[serde(default = "default_true")]
-    pub fail_fast: bool,
-    /// Optional grouping/filtering labels.
-    #[serde(default)]
-    pub tags: Vec<String>,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-/// A procedure with all defaults resolved.
-///
-/// Every field is explicit — no further inference needed downstream.
-#[derive(Debug, Clone)]
-pub struct ResolvedProcedure {
-    /// Procedure name.
-    pub name: String,
-    /// Session name to run on.
-    pub session: String,
-    /// Commands to execute.
-    pub commands: Vec<String>,
-    /// Description (empty string if not provided).
-    pub description: String,
-    /// Whether to disable TTY allocation.
-    pub no_tty: bool,
-    /// Whether to stop on first failure.
-    pub fail_fast: bool,
-    /// Tags for grouping and filtering.
-    pub tags: Vec<String>,
-}
-
 /// Severity of a validation finding.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Severity {
@@ -145,6 +147,8 @@ pub struct ValidationIssue {
     pub severity: Severity,
     /// The session this issue relates to, if applicable.
     pub session_name: Option<String>,
+    /// The procedure this issue relates to, if applicable.
+    pub procedure_name: Option<String>,
     /// The specific field with the problem, if applicable.
     pub field: Option<String>,
     /// Human-readable explanation.
@@ -155,12 +159,15 @@ pub struct ValidationIssue {
 
 impl fmt::Display for ValidationIssue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Format: severity[code]: session "name" field "field": message
+        // Format: severity[code]: [procedure "name"] [session "name"] field "field": message
         write!(f, "{}", self.severity)?;
         if let Some(ref code) = self.code {
             write!(f, "[{code}]")?;
         }
         write!(f, ":")?;
+        if let Some(ref name) = self.procedure_name {
+            write!(f, " procedure \"{name}\"")?;
+        }
         if let Some(ref name) = self.session_name {
             write!(f, " session \"{name}\"")?;
         }
@@ -218,6 +225,7 @@ mod tests {
         ValidationIssue {
             severity: Severity::Error,
             session_name: Some("myhost".into()),
+            procedure_name: None,
             field: Some("host".into()),
             message: "host must not be empty".into(),
             code: Some("missing-host".into()),
@@ -239,6 +247,7 @@ mod tests {
         let issue = ValidationIssue {
             severity: Severity::Warning,
             session_name: Some("s".into()),
+            procedure_name: None,
             field: None,
             message: "advisory note".into(),
             code: None,
@@ -253,6 +262,7 @@ mod tests {
         let issue = ValidationIssue {
             severity: Severity::Error,
             session_name: None,
+            procedure_name: None,
             field: Some("port".into()),
             message: "bad port".into(),
             code: Some("invalid-port".into()),
@@ -268,6 +278,7 @@ mod tests {
         let issue = ValidationIssue {
             severity: Severity::Warning,
             session_name: None,
+            procedure_name: None,
             field: None,
             message: "generic warning".into(),
             code: None,
@@ -282,6 +293,37 @@ mod tests {
         let cloned = issue.clone();
         assert_eq!(cloned.message, issue.message);
         assert_eq!(cloned.code, issue.code);
+    }
+
+    #[test]
+    fn validation_issue_display_with_procedure_name() {
+        let issue = ValidationIssue {
+            severity: Severity::Error,
+            session_name: None,
+            procedure_name: Some("deploy".into()),
+            field: Some("session".into()),
+            message: "session must not be empty".into(),
+            code: Some("empty-session".into()),
+        };
+        let s = issue.to_string();
+        assert!(s.contains("procedure \"deploy\""), "missing procedure: {s}");
+        assert!(s.contains("empty-session"), "missing code: {s}");
+        assert!(!s.contains("session \""), "unexpected session prefix: {s}");
+    }
+
+    #[test]
+    fn validation_issue_display_with_both_procedure_and_session() {
+        let issue = ValidationIssue {
+            severity: Severity::Warning,
+            session_name: Some("web".into()),
+            procedure_name: Some("deploy".into()),
+            field: None,
+            message: "some advisory".into(),
+            code: None,
+        };
+        let s = issue.to_string();
+        assert!(s.contains("procedure \"deploy\""), "{s}");
+        assert!(s.contains("session \"web\""), "{s}");
     }
 
     // --- Session construction ---
@@ -383,21 +425,37 @@ mod tests {
 
     // --- ResolvedProcedure ---
 
+    fn make_resolved_session() -> ResolvedSession {
+        ResolvedSession {
+            name: "db".into(),
+            host: "10.0.0.1".into(),
+            username: "admin".into(),
+            port: 22,
+            ssh_key: None,
+            key_source: KeySource::SystemDefault,
+            display_target: "admin@10.0.0.1:22".into(),
+            tags: vec![],
+            jump_target: None,
+        }
+    }
+
     #[test]
     fn resolved_procedure_clone() {
         let r = ResolvedProcedure {
             name: "backup".into(),
-            session: "db".into(),
+            session: make_resolved_session(),
             commands: vec!["pg_dump ...".into()],
-            description: "Run backup".into(),
+            shell_command: "pg_dump ...".into(),
+            description: Some("Run backup".into()),
             no_tty: true,
             fail_fast: false,
             tags: vec!["ops".into()],
         };
         let c = r.clone();
         assert_eq!(c.name, r.name);
-        assert_eq!(c.session, r.session);
+        assert_eq!(c.session.name, r.session.name);
         assert_eq!(c.commands, r.commands);
+        assert_eq!(c.shell_command, r.shell_command);
         assert_eq!(c.no_tty, r.no_tty);
         assert_eq!(c.fail_fast, r.fail_fast);
     }

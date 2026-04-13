@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use crate::model::{KeySource, ResolvedSession, Severity, ValidationIssue};
+use crate::model::{KeySource, Procedure, ResolvedSession, Severity, ValidationIssue};
 
 /// Validate a single resolved session and return any issues found.
 ///
@@ -16,6 +16,7 @@ pub fn validate_session(session: &ResolvedSession) -> Vec<ValidationIssue> {
         issues.push(ValidationIssue {
             severity: Severity::Error,
             session_name: Some(session.name.clone()),
+            procedure_name: None,
             field: Some("host".into()),
             message: "host must not be empty".into(),
             code: Some("missing-host".into()),
@@ -26,6 +27,7 @@ pub fn validate_session(session: &ResolvedSession) -> Vec<ValidationIssue> {
         issues.push(ValidationIssue {
             severity: Severity::Error,
             session_name: Some(session.name.clone()),
+            procedure_name: None,
             field: Some("port".into()),
             message: "port must be between 1 and 65535".into(),
             code: Some("invalid-port".into()),
@@ -38,6 +40,7 @@ pub fn validate_session(session: &ResolvedSession) -> Vec<ValidationIssue> {
                 issues.push(ValidationIssue {
                     severity: Severity::Warning,
                     session_name: Some(session.name.clone()),
+                    procedure_name: None,
                     field: Some("ssh_key".into()),
                     message: format!("identity file does not exist: {key_path}"),
                     code: Some("missing-key-file".into()),
@@ -50,6 +53,7 @@ pub fn validate_session(session: &ResolvedSession) -> Vec<ValidationIssue> {
         issues.push(ValidationIssue {
             severity: Severity::Warning,
             session_name: Some(session.name.clone()),
+            procedure_name: None,
             field: Some("host".into()),
             message: format!(
                 "host \"{}\" looks like a hostname; consider using an IP address",
@@ -91,6 +95,7 @@ pub fn validate_jump_refs_raw(sessions: &[crate::model::Session]) -> Vec<Validat
                 issues.push(ValidationIssue {
                     severity: Severity::Error,
                     session_name: Some(session.name.clone()),
+                    procedure_name: None,
                     field: Some("jump".into()),
                     message: "jump host must not be empty".into(),
                     code: Some("empty-jump-host".into()),
@@ -99,6 +104,7 @@ pub fn validate_jump_refs_raw(sessions: &[crate::model::Session]) -> Vec<Validat
                 issues.push(ValidationIssue {
                     severity: Severity::Error,
                     session_name: Some(session.name.clone()),
+                    procedure_name: None,
                     field: Some("jump".into()),
                     message: "session cannot jump through itself".into(),
                     code: Some("circular-jump".into()),
@@ -108,6 +114,80 @@ pub fn validate_jump_refs_raw(sessions: &[crate::model::Session]) -> Vec<Validat
     }
 
     issues
+}
+
+/// Validate a single raw procedure and return any issues found.
+///
+/// Checks performed:
+/// - **Error**: session field is empty.
+/// - **Error**: session references a non-existent session name.
+/// - **Error**: commands list is empty.
+/// - **Warning**: an individual command string is empty.
+pub fn validate_procedure(
+    procedure: &Procedure,
+    session_names: &std::collections::HashSet<&str>,
+) -> Vec<ValidationIssue> {
+    let mut issues = Vec::new();
+
+    if procedure.session.trim().is_empty() {
+        issues.push(ValidationIssue {
+            severity: Severity::Error,
+            session_name: None,
+            procedure_name: Some(procedure.name.clone()),
+            field: Some("session".into()),
+            message: "session must not be empty".into(),
+            code: Some("empty-session".into()),
+        });
+    } else if !session_names.contains(procedure.session.as_str()) {
+        issues.push(ValidationIssue {
+            severity: Severity::Error,
+            session_name: None,
+            procedure_name: Some(procedure.name.clone()),
+            field: Some("session".into()),
+            message: format!(
+                "session \"{}\" does not exist",
+                procedure.session
+            ),
+            code: Some("unknown-session".into()),
+        });
+    }
+
+    if procedure.commands.is_empty() {
+        issues.push(ValidationIssue {
+            severity: Severity::Error,
+            session_name: None,
+            procedure_name: Some(procedure.name.clone()),
+            field: Some("commands".into()),
+            message: "commands list must not be empty".into(),
+            code: Some("empty-commands".into()),
+        });
+    } else {
+        for (i, cmd) in procedure.commands.iter().enumerate() {
+            if cmd.trim().is_empty() {
+                issues.push(ValidationIssue {
+                    severity: Severity::Warning,
+                    session_name: None,
+                    procedure_name: Some(procedure.name.clone()),
+                    field: Some(format!("commands[{}]", i)),
+                    message: "empty command string".into(),
+                    code: Some("empty-command".into()),
+                });
+            }
+        }
+    }
+
+    issues
+}
+
+/// Validate all procedures against the given session names and collect issues.
+pub fn validate_procedures(
+    procedures: &[Procedure],
+    session_names: &std::collections::HashSet<&str>,
+) -> Vec<ValidationIssue> {
+    procedures
+        .iter()
+        .flat_map(|p| validate_procedure(p, session_names))
+        .collect()
 }
 
 /// Returns `true` if the string looks like an IPv4 or IPv6 address.
@@ -284,5 +364,137 @@ mod tests {
         assert!(issues
             .iter()
             .any(|i| i.code.as_deref() == Some("invalid-port")));
+    }
+
+    // --- Procedure validation ---
+
+    fn make_procedure(overrides: impl FnOnce(&mut Procedure)) -> Procedure {
+        let mut p = Procedure {
+            name: "deploy".into(),
+            session: "web".into(),
+            commands: vec!["git pull".into(), "systemctl restart app".into()],
+            description: None,
+            no_tty: false,
+            fail_fast: true,
+            tags: vec![],
+        };
+        overrides(&mut p);
+        p
+    }
+
+    fn session_names_set() -> std::collections::HashSet<&'static str> {
+        ["web", "db", "bastion"].iter().cloned().collect()
+    }
+
+    #[test]
+    fn valid_procedure_has_no_issues() {
+        let issues = validate_procedure(&make_procedure(|_| {}), &session_names_set());
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn empty_session_is_error() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.session = "".into()),
+            &session_names_set(),
+        );
+        assert_eq!(codes(&issues), vec!["empty-session"]);
+        assert_eq!(issues[0].severity, Severity::Error);
+        assert_eq!(issues[0].procedure_name.as_deref(), Some("deploy"));
+    }
+
+    #[test]
+    fn whitespace_session_is_error() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.session = "  ".into()),
+            &session_names_set(),
+        );
+        assert_eq!(codes(&issues), vec!["empty-session"]);
+    }
+
+    #[test]
+    fn unknown_session_is_error() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.session = "nonexistent".into()),
+            &session_names_set(),
+        );
+        assert_eq!(codes(&issues), vec!["unknown-session"]);
+        assert_eq!(issues[0].severity, Severity::Error);
+        assert!(issues[0].message.contains("nonexistent"));
+    }
+
+    #[test]
+    fn empty_commands_is_error() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.commands = vec![]),
+            &session_names_set(),
+        );
+        assert_eq!(codes(&issues), vec!["empty-commands"]);
+        assert_eq!(issues[0].severity, Severity::Error);
+    }
+
+    #[test]
+    fn empty_command_string_is_warning() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.commands = vec!["git pull".into(), "".into()]),
+            &session_names_set(),
+        );
+        assert_eq!(codes(&issues), vec!["empty-command"]);
+        assert_eq!(issues[0].severity, Severity::Warning);
+        assert_eq!(issues[0].field.as_deref(), Some("commands[1]"));
+    }
+
+    #[test]
+    fn whitespace_command_string_is_warning() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.commands = vec!["  ".into()]),
+            &session_names_set(),
+        );
+        assert_eq!(codes(&issues), vec!["empty-command"]);
+    }
+
+    #[test]
+    fn multiple_empty_commands_generate_multiple_warnings() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.commands = vec!["".into(), "ok".into(), "".into()]),
+            &session_names_set(),
+        );
+        let empty_cmd_issues: Vec<_> = issues
+            .iter()
+            .filter(|i| i.code.as_deref() == Some("empty-command"))
+            .collect();
+        assert_eq!(empty_cmd_issues.len(), 2);
+        assert_eq!(empty_cmd_issues[0].field.as_deref(), Some("commands[0]"));
+        assert_eq!(empty_cmd_issues[1].field.as_deref(), Some("commands[2]"));
+    }
+
+    #[test]
+    fn validate_procedures_collects_all() {
+        let names = session_names_set();
+        let procs = vec![
+            make_procedure(|p| p.session = "unknown".into()),
+            make_procedure(|p| p.commands = vec![]),
+        ];
+        let issues = validate_procedures(&procs, &names);
+        assert!(issues.len() >= 2);
+        assert!(issues.iter().any(|i| i.code.as_deref() == Some("unknown-session")));
+        assert!(issues.iter().any(|i| i.code.as_deref() == Some("empty-commands")));
+    }
+
+    #[test]
+    fn validate_procedures_empty_slice() {
+        let issues = validate_procedures(&[], &session_names_set());
+        assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn procedure_validation_display_includes_procedure_name() {
+        let issues = validate_procedure(
+            &make_procedure(|p| p.commands = vec![]),
+            &session_names_set(),
+        );
+        let display = format!("{}", issues[0]);
+        assert!(display.contains("procedure \"deploy\""), "display: {display}");
+        assert!(display.contains("empty-commands"), "display: {display}");
     }
 }

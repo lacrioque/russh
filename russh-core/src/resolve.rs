@@ -1,4 +1,4 @@
-use crate::model::{KeySource, ResolvedSession, Session};
+use crate::model::{KeySource, Procedure, ResolvedProcedure, ResolvedSession, Session};
 use crate::paths::expand_tilde;
 use std::env;
 
@@ -32,6 +32,37 @@ pub fn resolve_session_with_jump(session: &Session, all_sessions: &[Session]) ->
     }
 
     resolved
+}
+
+/// Resolves a raw [`Procedure`] into a [`ResolvedProcedure`].
+///
+/// Looks up the referenced session by name from the sessions list, resolves it
+/// (with jump host support), joins commands with `&&` (fail_fast=true) or `;`
+/// (fail_fast=false) into `shell_command`, and normalizes tags.
+///
+/// Returns `None` if the referenced session name is not found in `all_sessions`.
+pub fn resolve_procedure(
+    procedure: &Procedure,
+    all_sessions: &[Session],
+) -> Option<ResolvedProcedure> {
+    let session = all_sessions.iter().find(|s| s.name == procedure.session)?;
+    let resolved_session = resolve_session_with_jump(session, all_sessions);
+
+    let separator = if procedure.fail_fast { " && " } else { " ; " };
+    let shell_command = procedure.commands.join(separator);
+
+    let tags = normalize_tags(&procedure.tags);
+
+    Some(ResolvedProcedure {
+        name: procedure.name.clone(),
+        session: resolved_session,
+        commands: procedure.commands.clone(),
+        shell_command,
+        description: procedure.description.clone(),
+        no_tty: procedure.no_tty,
+        fail_fast: procedure.fail_fast,
+        tags,
+    })
 }
 
 /// Resolves a raw [`Session`] into a [`ResolvedSession`] with all defaults applied.
@@ -347,5 +378,126 @@ mod tests {
         });
         let resolved = resolve_session_with_jump(&target, &[]);
         assert!(resolved.jump_target.is_none());
+    }
+
+    // --- Procedure resolution ---
+
+    fn make_procedure(overrides: impl FnOnce(&mut Procedure)) -> Procedure {
+        let mut p = Procedure {
+            name: "test_proc".into(),
+            session: "test".into(),
+            commands: vec!["echo hello".into(), "echo world".into()],
+            description: None,
+            no_tty: false,
+            fail_fast: true,
+            tags: vec![],
+        };
+        overrides(&mut p);
+        p
+    }
+
+    fn default_sessions() -> Vec<Session> {
+        vec![
+            make_session(|s| {
+                s.name = "web".into();
+                s.host = "10.0.0.1".into();
+            }),
+            make_session(|s| {
+                s.name = "test".into();
+                s.host = "10.0.0.2".into();
+            }),
+        ]
+    }
+
+    #[test]
+    fn resolve_procedure_basic() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|_| {});
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert_eq!(resolved.name, "test_proc");
+        assert_eq!(resolved.session.name, "test");
+        assert_eq!(resolved.session.host, "10.0.0.2");
+        assert_eq!(resolved.commands, vec!["echo hello", "echo world"]);
+        assert_eq!(resolved.shell_command, "echo hello && echo world");
+        assert!(resolved.fail_fast);
+        assert!(!resolved.no_tty);
+    }
+
+    #[test]
+    fn resolve_procedure_fail_fast_false_uses_semicolon() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| p.fail_fast = false);
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert_eq!(resolved.shell_command, "echo hello ; echo world");
+        assert!(!resolved.fail_fast);
+    }
+
+    #[test]
+    fn resolve_procedure_single_command() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| p.commands = vec!["ls -la".into()]);
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert_eq!(resolved.shell_command, "ls -la");
+    }
+
+    #[test]
+    fn resolve_procedure_unknown_session_returns_none() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| p.session = "nonexistent".into());
+        assert!(resolve_procedure(&proc, &sessions).is_none());
+    }
+
+    #[test]
+    fn resolve_procedure_normalizes_tags() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| {
+            p.tags = vec![" deploy ".into(), "prod".into(), "deploy".into(), "  ".into()];
+        });
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert_eq!(resolved.tags, vec!["deploy", "prod"]);
+    }
+
+    #[test]
+    fn resolve_procedure_no_description_is_none() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| p.description = None);
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert!(resolved.description.is_none());
+    }
+
+    #[test]
+    fn resolve_procedure_preserves_description() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| p.description = Some("Deploy app".into()));
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert_eq!(resolved.description.as_deref(), Some("Deploy app"));
+    }
+
+    #[test]
+    fn resolve_procedure_preserves_no_tty() {
+        let sessions = default_sessions();
+        let proc = make_procedure(|p| p.no_tty = true);
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert!(resolved.no_tty);
+    }
+
+    #[test]
+    fn resolve_procedure_with_jump_host() {
+        let sessions = vec![
+            make_session(|s| {
+                s.name = "bastion".into();
+                s.host = "10.0.0.1".into();
+                s.username = Some("ops".into());
+            }),
+            make_session(|s| {
+                s.name = "internal".into();
+                s.host = "10.0.0.2".into();
+                s.jump = Some("bastion".into());
+            }),
+        ];
+        let proc = make_procedure(|p| p.session = "internal".into());
+        let resolved = resolve_procedure(&proc, &sessions).unwrap();
+        assert_eq!(resolved.session.name, "internal");
+        assert!(resolved.session.jump_target.is_some());
     }
 }
