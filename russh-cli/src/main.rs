@@ -66,6 +66,8 @@ enum Command {
         #[arg(long, short = 'n')]
         dry_run: bool,
     },
+    /// Print the current config file contents to stdout
+    Export,
     /// Interactive menu (default when no subcommand given)
     Menu,
     /// Show version and default config path
@@ -129,6 +131,9 @@ fn main() -> Result<()> {
                 dry_run,
                 cli.config.as_deref(),
             )?;
+        }
+        Command::Export => {
+            commands::export::run(&config_path)?;
         }
         Command::Menu => {
             commands::menu::run(cli.config.as_deref())?;

@@ -234,6 +234,39 @@ port = 0
         .stderr(predicate::str::contains("launch-blocking"));
 }
 
+// ── export ───────────────────────────────────────────────────────────────────
+
+#[test]
+fn export_prints_config_contents() {
+    let content = "[sessions.dev]\nhost = \"10.0.0.1\"\nusername = \"admin\"\n";
+    let cfg = write_config(content);
+    russh()
+        .args(["--config", cfg.path().to_str().unwrap(), "export"])
+        .assert()
+        .success()
+        .stdout(predicate::eq(content));
+}
+
+#[test]
+fn export_fixture_matches_file() {
+    let path = fixture("three_sessions.toml");
+    let expected = std::fs::read_to_string(&path).unwrap();
+    russh()
+        .args(["--config", &path, "export"])
+        .assert()
+        .success()
+        .stdout(predicate::eq(expected.as_str()));
+}
+
+#[test]
+fn export_missing_config_exits_nonzero() {
+    russh()
+        .args(["--config", "/nonexistent/path/config.toml", "export"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("config file not found"));
+}
+
 // ── no-subcommand (menu entry path) ──────────────────────────────────────────
 
 #[test]
