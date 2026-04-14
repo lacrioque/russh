@@ -3,6 +3,8 @@ name = "russh-core"
 version = "1.0.0"
 edition = "2021"
 license = "GPL-3.0-only"
+description = "Core SSH session management library — config, resolution, validation, and command building"
+repository = "https://github.com/lacrioque/russh"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
