@@ -31,3 +31,7 @@ cargo test -p russh-cli
 ## Language
 
 This is a **Rust** project. Use `cargo` commands, not `go` commands.
+
+## Versioning & Releases
+
+This project follows **strict semver**. Once a git tag is created, it is immutable — retagging is never allowed. If a release needs a fix (even metadata-only changes like README or CI), bump the patch version and create a new tag.

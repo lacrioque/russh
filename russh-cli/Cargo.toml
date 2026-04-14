@@ -1,17 +1,18 @@
 [package]
 name = "russh-cli"
-version = "1.0.1"
+version = "1.0.2"
 edition = "2021"
 license = "GPL-3.0-only"
 description = "CLI tool for managing and connecting to SSH sessions"
 repository = "https://github.com/lacrioque/russh"
+readme = "README.md"
 
 [[bin]]
 name = "russh"
 path = "src/main.rs"
 
 [dependencies]
-russh-core = { path = "../russh-core", version = "1.0.1" }
+russh-core = { path = "../russh-core", version = "1.0.2" }
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 dirs-next = "2"
