@@ -19,7 +19,11 @@ struct Cli {
 #[derive(Subcommand)]
 enum Command {
     /// List available SSH sessions/hosts
-    List,
+    List {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
     /// Show details of a session or host
     Show {
         /// Session or host identifier
@@ -32,6 +36,24 @@ enum Command {
     Connect {
         /// Session name
         session: String,
+    },
+    /// Execute a one-off command on a remote session
+    ///
+    /// Example: russh exec dev-server "uptime"
+    Exec {
+        /// Session name
+        session: String,
+        /// Command to execute on the remote host
+        command: String,
+        /// Disable pseudo-TTY allocation
+        #[arg(long, short = 'T')]
+        no_tty: bool,
+        /// Output result as JSON (captures stdout/stderr)
+        #[arg(long)]
+        json: bool,
+        /// Capture output and write to stdout/stderr (instead of inheriting TTY)
+        #[arg(long)]
+        to_std: bool,
     },
     /// Insert a new session into the config
     ///
@@ -182,8 +204,8 @@ fn main() -> Result<()> {
         .unwrap_or_else(default_config_path);
 
     match cli.command.unwrap_or(Command::Menu) {
-        Command::List => {
-            commands::list::run(cli.config.as_deref())?;
+        Command::List { json } => {
+            commands::list::run(cli.config.as_deref(), json)?;
         }
         Command::Show { target } => {
             commands::show::run(&target, &config_path)?;
@@ -193,6 +215,22 @@ fn main() -> Result<()> {
         }
         Command::Connect { session } => {
             commands::connect::run(&session, cli.config.as_deref())?;
+        }
+        Command::Exec {
+            session,
+            command,
+            no_tty,
+            json,
+            to_std,
+        } => {
+            commands::exec::run(
+                &session,
+                &command,
+                no_tty,
+                json,
+                to_std,
+                cli.config.as_deref(),
+            )?;
         }
         Command::Insert {
             name,

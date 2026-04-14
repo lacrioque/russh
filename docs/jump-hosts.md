@@ -131,5 +131,6 @@ tags = ["database"]
 ```bash
 russh connect app    # Routes through bastion
 russh connect db     # Routes through bastion
+russh exec app "uptime"  # One-off command through bastion
 russh deploy --all   # Deploys to all three, routing through bastion as needed
 ```

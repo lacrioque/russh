@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.3] - 2026-04-14
+
+### Added
+
+- `exec` command for ad-hoc remote command execution (`russh exec <session> <command>`)
+  - `--json` flag for structured JSON output (captures stdout, stderr, exit code)
+  - `--to-std` flag for captured output written to stdout/stderr
+  - `-T` / `--no-tty` flag to disable pseudo-TTY allocation
+- `list --json` flag for JSON output of all resolved sessions
+- `spawn_ssh_capture` function in `russh-core` for programmatic output capture
+- `Serialize` derives on `ResolvedSession` and `KeySource` for JSON serialization
+
 ## [1.0.2] - 2026-04-14
 
 ### Added
@@ -105,6 +117,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Initial project scaffold
 - rustfmt + clippy clean baseline
 
+[1.0.3]: https://github.com/lacrioque/russh/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/lacrioque/russh/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/lacrioque/russh/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/lacrioque/russh/compare/v0.2.1...v1.0.0

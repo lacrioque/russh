@@ -26,6 +26,7 @@ Interactive session picker. Search and select from your configured sessions, the
 
 ```bash
 russh list
+russh list --json
 ```
 
 List all configured sessions in a table.
@@ -33,6 +34,14 @@ List all configured sessions in a table.
 **Output columns**: NAME, HOST, USER, PORT, KEY, TAGS
 
 Values shown are resolved (defaults applied).
+
+**Options**:
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Output as a JSON array of resolved sessions |
+
+With `--json`, the output is a JSON array where each element contains `name`, `host`, `username`, `port`, `ssh_key`, `key_source`, `display_target`, `tags`, and `jump_target`.
 
 ## russh show
 
@@ -56,6 +65,61 @@ russh c <session-name>
 Connect to a session by name. Resolves all defaults and jump hosts, validates the session, then execs SSH (replaces the current process).
 
 If validation finds launch-blocking errors, the connection is refused with an error message.
+
+## russh exec
+
+```bash
+russh exec <session-name> "<command>" [OPTIONS]
+```
+
+Execute a one-off command on a remote host. Unlike `connect`, this does not replace the current process — it runs the command, waits for it to finish, and returns.
+
+**Arguments**:
+
+| Argument | Description |
+|----------|-------------|
+| `session-name` | Name of the session to run on |
+| `command` | Shell command to execute remotely |
+
+**Options**:
+
+| Flag | Description |
+|------|-------------|
+| `--json` | Capture output and return as structured JSON |
+| `--to-std` | Capture output and write to stdout/stderr |
+| `-T, --no-tty` | Disable pseudo-TTY allocation |
+
+By default (no flags), the remote command inherits the terminal — output streams directly. With `--to-std`, output is captured and replayed cleanly. With `--json`, output is returned as a JSON object with `session`, `command`, `exit_code`, `stdout`, and `stderr` fields.
+
+The process exit code always mirrors the remote command's exit code.
+
+**Examples**:
+
+```bash
+# Basic — output streams to terminal
+russh exec prod-web "systemctl status nginx"
+
+# Captured — stdout/stderr written cleanly
+russh exec prod-web "df -h /" --to-std
+
+# JSON — structured output for scripting
+russh exec prod-web "uptime" --json
+
+# Non-interactive command
+russh exec prod-db "pg_dump mydb | gzip > /tmp/backup.sql.gz" -T
+```
+
+**JSON output format**:
+
+```json
+{
+  "session": "prod-web",
+  "command": "uptime",
+  "exit_code": 0,
+  "stdout": " 14:32:01 up 42 days,  3:15,  1 user,  load average: 0.08, 0.12, 0.10\n",
+  "stderr": ""
+}
+```
 
 ## russh check
 
@@ -215,7 +279,7 @@ Print the version number and config file path.
 **Output example**:
 
 ```
-russh 0.2.0
+russh 1.0.3
 config: /home/user/.config/russh/config.toml
 ```
 

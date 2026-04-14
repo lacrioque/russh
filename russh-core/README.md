@@ -54,13 +54,28 @@ for issue in &issues {
 }
 ```
 
-### Build SSH commands
+### Build and run SSH commands
 
 ```rust
-use russh_core::ssh::build_command;
+use russh_core::ssh::{build_command, build_procedure_command, spawn_ssh_capture};
 
+// Build a connect command
 let cmd = build_command(&resolved_session);
 println!("ssh {}", cmd.display); // e.g. "ssh -p 2222 -i ~/.ssh/id_ed25519 deploy@10.0.0.50"
+
+// Build and run a one-off remote command, capturing output
+let spec = build_procedure_command(&resolved_session, "uptime", false);
+let output = spawn_ssh_capture(&spec).unwrap();
+println!("exit: {:?}, stdout: {}", output.exit_code, output.stdout);
+```
+
+### JSON serialization
+
+`ResolvedSession` implements `Serialize`, so you can output sessions as JSON:
+
+```rust
+let resolved = resolve_session(&session);
+println!("{}", serde_json::to_string_pretty(&resolved).unwrap());
 ```
 
 ## Config format

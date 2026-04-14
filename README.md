@@ -49,8 +49,9 @@ With no subcommand, `russh` opens an interactive session picker.
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `russh list` | — | List all configured sessions |
+| `russh list [--json]` | — | List all configured sessions |
 | `russh show <name>` | — | Show session details (raw and resolved) |
+| `russh exec <name> <cmd>` | — | Run a one-off command on a remote host |
 | `russh connect <name>` | `c` | Connect to a session by name |
 | `russh insert <name> <target>` | `i` | Add a new session to the config |
 | `russh edit [<name>]` | `e` | Edit a session (or open config in `$EDITOR`) |
@@ -79,8 +80,14 @@ Procedures are named command sequences you run on remote sessions. They live in 
 ```bash
 # List all sessions
 russh list
+russh list --json
 
-# Connect to a session
+# Run a command on a remote host
+russh exec dev-server "uptime"
+russh exec dev-server "df -h" --json
+russh exec dev-server "whoami" --to-std
+
+# Connect to a session (interactive)
 russh connect dev-server
 russh c dev-server
 

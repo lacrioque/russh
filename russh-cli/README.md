@@ -31,8 +31,9 @@ russh
 
 | Command | Alias | Description |
 |---------|-------|-------------|
-| `russh list` | — | List all configured sessions |
+| `russh list [--json]` | — | List all configured sessions |
 | `russh show <name>` | — | Show session details (raw and resolved) |
+| `russh exec <name> <cmd>` | — | Run a one-off command on a remote host |
 | `russh connect <name>` | `c` | Connect to a session |
 | `russh insert <name> <target>` | `i` | Add a new session |
 | `russh edit [<name>]` | `e` | Edit a session or open config in `$EDITOR` |

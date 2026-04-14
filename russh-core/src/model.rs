@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt;
 
 /// Raw session as deserialized from TOML config.
@@ -80,7 +80,8 @@ pub struct ResolvedProcedure {
 }
 
 /// Where the SSH key came from after resolution.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum KeySource {
     /// User explicitly configured an `ssh_key` path.
     Explicit,
@@ -100,7 +101,7 @@ impl fmt::Display for KeySource {
 /// A session with all defaults resolved and paths expanded.
 ///
 /// Every field is explicit — no further inference needed downstream.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ResolvedSession {
     /// Session name.
     pub name: String,

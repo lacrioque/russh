@@ -1,173 +1,187 @@
 # Russh — AI Agent Usage Guide
 
 Russh is an SSH session manager. It stores named SSH sessions in a TOML config
-and delegates to the system `ssh` binary. You can use it to run commands on
-remote hosts without needing raw SSH credentials or connection details.
+and delegates to the system `ssh` binary. AI coding agents can use it to run
+commands on remote hosts without handling raw SSH credentials or connection strings.
 
-## When to use russh
+## Quick start for agents
 
-Use russh when you need to:
-- Run a command on a remote host the user has configured
-- Check service status, logs, disk usage, or process state on remote machines
-- Verify deployments or configuration on remote systems
-- List what hosts are available before suggesting SSH operations
-
-Do NOT use russh to:
-- Transfer files (use `scp` or `rsync` directly if needed)
-- Modify SSH keys or credentials
-- Change the russh config without the user asking
-
-## Available commands
-
-### List sessions (safe, read-only)
 ```bash
-russh list
-```
-Shows all configured SSH sessions with host, user, port, and tags.
-Use this first to discover what hosts are available.
+# Discover available hosts
+russh list                              # table format
+russh list --json                       # machine-readable
 
-### Show session details (safe, read-only)
-```bash
-russh show <session-name>
-```
-Shows raw config and resolved values (with defaults applied) for one session.
-Use this to understand connection parameters before connecting.
+# Run a command on a remote host
+russh exec dev-server "uptime"          # output inherits terminal
+russh exec dev-server "df -h" --to-std  # captured, written to stdout/stderr
+russh exec dev-server "whoami" --json   # structured JSON output
 
-### Validate config (safe, read-only)
-```bash
-russh check
-```
-Reports errors and warnings in the config. Run this if connections fail
-or after config changes.
-
-### Run a command on a remote host
-```bash
-russh connect <session-name>
-```
-Opens an interactive SSH session. This is interactive and will block.
-
-To run a **non-interactive command** on a remote host, use SSH directly
-with the session details from `russh show`:
-```bash
-ssh -p <port> -i <key> <user>@<host> '<command>'
-```
-
-Or construct it from `russh show` output. Example workflow:
-```bash
-# 1. Find the host
-russh list
-
-# 2. Get connection details
+# Inspect a session before using it
 russh show dev-server
 
-# 3. Run a remote command using those details
-ssh -p 2222 -i ~/.ssh/id_ed25519 deploy@10.0.0.50 'systemctl status nginx'
+# Validate config
+russh check
 ```
 
-### Add a session
+## Core commands
+
+### Read-only (always safe, no approval needed)
+
+| Command | Purpose |
+|---------|---------|
+| `russh list` | List all sessions (table) |
+| `russh list --json` | List all sessions (JSON array of resolved sessions) |
+| `russh show <name>` | Show raw + resolved details for one session |
+| `russh check` | Validate config, report errors/warnings |
+| `russh export` | Print raw config file to stdout |
+| `russh version` | Show version and config path |
+| `russh proc list` | List all procedures |
+| `russh proc show <name>` | Show procedure details + SSH command preview |
+| `russh proc check` | Validate all procedures |
+
+### Remote execution (requires user approval)
+
+| Command | Purpose |
+|---------|---------|
+| `russh exec <session> "<command>"` | Run a one-off command on a remote host |
+| `russh exec <session> "<cmd>" --json` | Same, but output as JSON with exit code |
+| `russh exec <session> "<cmd>" --to-std` | Same, but capture and write to stdout/stderr |
+| `russh exec <session> "<cmd>" -T` | Disable pseudo-TTY (for non-interactive commands) |
+| `russh proc run <name>` | Run a named procedure |
+| `russh connect <name>` | Open interactive SSH session (blocks, replaces process) |
+
+### Config modification (requires user approval)
+
+| Command | Purpose |
+|---------|---------|
+| `russh insert <name> user@host` | Add a new session |
+| `russh edit <name> --host X` | Modify an existing session |
+| `russh deploy <name>` | Push config to remote host via SCP |
+
+## The `exec` command — primary tool for agents
+
+`russh exec` is the command designed for programmatic use. It resolves the
+session, validates it, runs the command via SSH, and returns.
+
 ```bash
-russh insert <name> <user@host> [-p port] [-i keyfile] [-J jump-host]
+# Basic — output goes to terminal (inherited stdio)
+russh exec prod-web "systemctl status nginx"
+
+# Captured — stdout/stderr are captured and replayed cleanly
+russh exec prod-web "systemctl status nginx" --to-std
+
+# JSON — structured output for parsing
+russh exec prod-web "systemctl status nginx" --json
 ```
-Only use when the user explicitly asks to add a new session.
 
-## Config location
+### JSON output format
 
-Default: `~/.config/russh/config.toml`
+```json
+{
+  "session": "prod-web",
+  "command": "systemctl status nginx",
+  "exit_code": 0,
+  "stdout": "● nginx.service - A high performance web server...\n",
+  "stderr": ""
+}
+```
 
-Override: `russh --config /path/to/config.toml <command>`
+The process exit code mirrors the remote command's exit code, so you can
+check `$?` even in JSON mode.
+
+### When to use which flag
+
+| Scenario | Flag | Why |
+|----------|------|-----|
+| Quick check, human-readable | (none) | Output streams directly |
+| Parsing output programmatically | `--json` | Structured, includes exit code |
+| Piping output to another command | `--to-std` | Clean capture without JSON wrapper |
+| Non-interactive command (no TTY) | `-T` | Avoids TTY allocation errors |
+
+## `list --json` output format
+
+```json
+[
+  {
+    "name": "dev-server",
+    "host": "10.0.0.50",
+    "username": "deploy",
+    "port": 2222,
+    "ssh_key": "/home/user/.ssh/id_ed25519",
+    "key_source": "explicit",
+    "display_target": "deploy@10.0.0.50:2222",
+    "tags": ["dev", "linux"],
+    "jump_target": null
+  }
+]
+```
+
+## Procedures
+
+Procedures are named command sequences stored in `~/.config/russh/procedures.toml`.
+Use them for multi-step operations.
+
+```bash
+# Inspect
+russh proc list
+russh proc show health-check
+
+# Run
+russh proc run health-check
+russh proc run health-check --log /tmp/health.log  # redirect output to file
+```
 
 ## Permission boundaries
 
-| Action | Permission level |
-|--------|-----------------|
-| `russh list` | Always safe — read-only, local |
-| `russh show <name>` | Always safe — read-only, local |
-| `russh check` | Always safe — read-only, local |
-| `russh connect <name>` | Requires user approval — opens SSH session |
-| `ssh ... '<command>'` | Requires user approval — executes on remote host |
-| `russh insert ...` | Requires user approval — modifies config file |
+| Action | Safety | Notes |
+|--------|--------|-------|
+| `list`, `show`, `check`, `export`, `version` | Safe | Read-only, local only |
+| `proc list`, `proc show`, `proc check` | Safe | Read-only, local only |
+| `exec <session> "<cmd>"` | Ask first | Executes on remote host |
+| `proc run <name>` | Ask first | Executes on remote host |
+| `connect <session>` | Ask first | Replaces process with SSH |
+| `insert`, `edit`, `deploy` | Ask first | Modifies config or remote state |
 
-**Rule**: `list`, `show`, and `check` are free to run without asking.
-Anything that connects to a remote host or modifies config — ask first.
+**Rule**: Anything that touches a remote host or modifies config — ask the user first.
+Read-only local commands are always safe.
+
+## Config location
+
+Default: `~/.config/russh/config.toml` (XDG-aware)
+
+Override per-command: `russh --config /path/to/config.toml <command>`
 
 ## Typical agent workflows
 
 ### Check if a service is running
 ```bash
-russh show prod-web          # get connection details
-# Then ask user: "Can I run 'systemctl status nginx' on prod-web?"
-ssh -p 22 -i ~/.ssh/prod_key ubuntu@prod.example.com 'systemctl status nginx'
+russh exec prod-web "systemctl is-active nginx" --to-std
 ```
 
 ### Check disk space across hosts
 ```bash
-russh list                   # discover hosts
-# For each relevant host:
-russh show <name>            # get details
-ssh <user>@<host> 'df -h'   # run with user approval
+# Discover hosts
+russh list --json | jq '.[].name' -r
+
+# For each host
+russh exec prod-web "df -h /" --to-std
+russh exec prod-db "df -h /" --to-std
 ```
 
 ### Verify a deployment
 ```bash
-russh show staging
-ssh admin@staging.example.com 'cat /etc/app/version.txt && systemctl is-active app'
+russh exec staging "cat /etc/app/version.txt && systemctl is-active app" --json
 ```
 
 ### Debug connectivity
 ```bash
-russh check                  # validate config first
-russh show <name>            # inspect resolved session
-# Then try: ssh -v <user>@<host> to debug
+russh check                    # validate config
+russh show <name>              # inspect resolved session
+russh exec <name> "echo ok"   # test connectivity
 ```
 
-## Tags
-
-Sessions can have tags (e.g., `prod`, `dev`, `database`). Use `russh list`
-output to filter by tag when deciding which hosts are relevant to a task.
-
-<!-- BEGIN BEADS INTEGRATION v:1 profile:minimal hash:ca08a54f -->
-## Beads Issue Tracker
-
-This project uses **bd (beads)** for issue tracking. Run `bd prime` to see full workflow context and commands.
-
-### Quick Reference
-
+### Run a multi-step operation
 ```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work
-bd close <id>         # Complete work
+russh proc show deploy         # inspect what it does
+russh proc run deploy          # run it (with user approval)
 ```
-
-### Rules
-
-- Use `bd` for ALL task tracking — do NOT use TodoWrite, TaskCreate, or markdown TODO lists
-- Run `bd prime` for detailed command reference and session close protocol
-- Use `bd remember` for persistent knowledge — do NOT use MEMORY.md files
-
-## Session Completion
-
-**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
-
-**MANDATORY WORKFLOW:**
-
-1. **File issues for remaining work** - Create issues for anything that needs follow-up
-2. **Run quality gates** (if code changed) - Tests, linters, builds
-3. **Update issue status** - Close finished work, update in-progress items
-4. **PUSH TO REMOTE** - This is MANDATORY:
-   ```bash
-   git pull --rebase
-   bd dolt push
-   git push
-   git status  # MUST show "up to date with origin"
-   ```
-5. **Clean up** - Clear stashes, prune remote branches
-6. **Verify** - All changes committed AND pushed
-7. **Hand off** - Provide context for next session
-
-**CRITICAL RULES:**
-- Work is NOT complete until `git push` succeeds
-- NEVER stop before pushing - that leaves work stranded locally
-- NEVER say "ready to push when you are" - YOU must push
-- If push fails, resolve and retry until it succeeds
-<!-- END BEADS INTEGRATION -->

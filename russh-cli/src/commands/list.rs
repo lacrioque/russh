@@ -22,15 +22,21 @@ struct Row {
     tags: String,
 }
 
-pub fn run(config_override: Option<&str>) -> Result<()> {
+pub fn run(config_override: Option<&str>, json: bool) -> Result<()> {
     let path = config_path(config_override).context("could not determine config path")?;
 
     let sessions = load_or_create_config(&path)?;
 
-    let rows: Vec<Row> = sessions
-        .iter()
-        .map(|s| {
-            let r = resolve_session(s);
+    let resolved: Vec<_> = sessions.iter().map(resolve_session).collect();
+
+    if json {
+        println!("{}", serde_json::to_string_pretty(&resolved)?);
+        return Ok(());
+    }
+
+    let rows: Vec<Row> = resolved
+        .into_iter()
+        .map(|r| {
             let key = match r.key_source {
                 KeySource::Explicit => r.ssh_key.unwrap_or_default(),
                 KeySource::SystemDefault => "system default".to_string(),

@@ -77,6 +77,17 @@ russh
 
 This opens a TUI menu where you can search and select from your configured sessions.
 
+## Run a quick command
+
+Use `exec` to run a one-off command without opening an interactive session:
+
+```bash
+russh exec myserver "uptime"
+russh exec myserver "df -h" --json
+```
+
+See [Commands: russh exec](commands.md#russh-exec) for all options.
+
 ## Verify your config
 
 Check for errors and warnings:

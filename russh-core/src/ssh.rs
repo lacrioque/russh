@@ -169,6 +169,41 @@ pub fn spawn_ssh(
     child.wait().map_err(ExecError::ExecFailed)
 }
 
+/// Result of a captured SSH execution.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct CapturedOutput {
+    /// Process exit code (None if terminated by signal).
+    pub exit_code: Option<i32>,
+    /// Captured standard output.
+    pub stdout: String,
+    /// Captured standard error.
+    pub stderr: String,
+}
+
+/// Spawns SSH and captures stdout/stderr as strings.
+///
+/// Unlike [`spawn_ssh`] which inherits or redirects to files, this variant
+/// captures all output in memory and returns it. Useful for programmatic
+/// consumption (e.g. JSON output mode).
+pub fn spawn_ssh_capture(spec: &CommandSpec) -> Result<CapturedOutput, ExecError> {
+    let output = Command::new(&spec.executable)
+        .args(&spec.args)
+        .output()
+        .map_err(|e| {
+            if e.kind() == io::ErrorKind::NotFound {
+                ExecError::NotFound(e)
+            } else {
+                ExecError::ExecFailed(e)
+            }
+        })?;
+
+    Ok(CapturedOutput {
+        exit_code: output.status.code(),
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+    })
+}
+
 /// Error returned when the ssh binary cannot be found or exec fails.
 #[derive(Debug, thiserror::Error)]
 pub enum ExecError {

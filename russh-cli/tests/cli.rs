@@ -73,6 +73,93 @@ fn list_missing_config_exits_nonzero() {
         .failure();
 }
 
+// ── list --json ─────────────────────────────────────────────────────────────
+
+#[test]
+fn list_json_outputs_valid_json() {
+    let output = russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "list",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert!(parsed.is_array());
+    assert_eq!(parsed.as_array().unwrap().len(), 3);
+}
+
+#[test]
+fn list_json_contains_session_fields() {
+    let output = russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "list",
+            "--json",
+        ])
+        .output()
+        .unwrap();
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    let first = &parsed[0];
+    assert!(first.get("name").is_some());
+    assert!(first.get("host").is_some());
+    assert!(first.get("username").is_some());
+    assert!(first.get("port").is_some());
+}
+
+#[test]
+fn list_json_empty_config_returns_empty_array() {
+    let cfg = write_config("[sessions]\n");
+    let output = russh()
+        .args(["--config", cfg.path().to_str().unwrap(), "list", "--json"])
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let parsed: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(parsed.as_array().unwrap().len(), 0);
+}
+
+// ── exec ────────────────────────────────────────────────────────────────────
+
+#[test]
+fn exec_unknown_session_exits_nonzero() {
+    russh()
+        .args([
+            "--config",
+            &fixture("three_sessions.toml"),
+            "exec",
+            "nosuchsession",
+            "uptime",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nosuchsession"));
+}
+
+#[test]
+fn exec_session_with_validation_error_exits_nonzero() {
+    let cfg = write_config(
+        r#"
+[sessions.broken]
+host = ""
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "exec",
+            "broken",
+            "uptime",
+        ])
+        .assert()
+        .failure();
+}
+
 // ── show ─────────────────────────────────────────────────────────────────────
 
 #[test]
