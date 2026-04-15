@@ -52,6 +52,7 @@ With no subcommand, `russh` opens an interactive session picker.
 | `russh list [--json]` | — | List all configured sessions |
 | `russh show <name>` | — | Show session details (raw and resolved) |
 | `russh exec <name> <cmd>` | — | Run a one-off command on a remote host |
+| `russh copy <src> <path> <dst> [path]` | — | Copy a file between two sessions via SCP |
 | `russh connect <name>` | `c` | Connect to a session by name |
 | `russh insert <name> <target>` | `i` | Add a new session to the config |
 | `russh edit [<name>]` | `e` | Edit a session (or open config in `$EDITOR`) |
@@ -86,6 +87,10 @@ russh list --json
 russh exec dev-server "uptime"
 russh exec dev-server "df -h" --json
 russh exec dev-server "whoami" --to-std
+
+# Copy a file between two sessions (defaults dest path to ~)
+russh copy prod-web /var/log/app.log backup-host
+russh copy prod-db ~/dump.sql backup-host ~/archives/
 
 # Connect to a session (interactive)
 russh connect dev-server

@@ -48,6 +48,7 @@ russh check
 | `russh exec <session> "<cmd>" --to-std` | Same, but capture and write to stdout/stderr |
 | `russh exec <session> "<cmd>" -T` | Disable pseudo-TTY (for non-interactive commands) |
 | `russh proc run <name>` | Run a named procedure |
+| `russh copy <src> <src-path> <dst> [dst-path]` | Copy a file between two sessions via SCP (dst path defaults to `~`) |
 | `russh connect <name>` | Open interactive SSH session (blocks, replaces process) |
 
 ### Config modification (requires user approval)
@@ -166,6 +167,16 @@ russh list --json | jq '.[].name' -r
 # For each host
 russh exec prod-web "df -h /" --to-std
 russh exec prod-db "df -h /" --to-std
+```
+
+### Copy a file between hosts
+```bash
+# Direct copy (single scp)
+russh copy prod-db ~/dump.sql backup-host ~/archives/
+
+# When sessions use different jump hosts, russh automatically falls back
+# to a two-step copy via a local temp file — each leg uses its own jump.
+russh copy -n prod-db ~/dump.sql staging-db ~/  # preview first
 ```
 
 ### Verify a deployment

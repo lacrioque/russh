@@ -166,6 +166,141 @@ fn build_scp_args(session: &ResolvedSession, local_path: &Path, remote_path: &st
     args
 }
 
+/// Build an SCP command spec for copying between two remote sessions directly.
+///
+/// Uses the source session's SSH options (port, key, jump) for the connection.
+/// Only suitable when the source and destination share the same jump host
+/// (or both are direct) — otherwise use [`host_copy_strategy`] to decide.
+pub fn build_host_copy_args(
+    source: &ResolvedSession,
+    source_path: &str,
+    dest: &ResolvedSession,
+    dest_path: &str,
+) -> Vec<String> {
+    let mut args = Vec::new();
+
+    if let Some(ref jump) = source.jump_target {
+        args.push("-J".into());
+        args.push(jump.clone());
+    }
+
+    args.push("-P".into());
+    args.push(source.port.to_string());
+
+    if let Some(ref key) = source.ssh_key {
+        args.push("-i".into());
+        args.push(key.clone());
+    }
+
+    let src = format!("{}@{}:{}", source.username, source.host, source_path);
+    let dst = format!("{}@{}:{}", dest.username, dest.host, dest_path);
+    args.push(src);
+    args.push(dst);
+
+    args
+}
+
+/// Build an SCP "download" command: remote session -> local path.
+///
+/// Uses the session's own SSH options. Used by the two-step copy strategy
+/// when source and destination have incompatible jump configurations.
+pub fn build_download_args(
+    session: &ResolvedSession,
+    remote_path: &str,
+    local_path: &Path,
+) -> Vec<String> {
+    let mut args = Vec::new();
+
+    if let Some(ref jump) = session.jump_target {
+        args.push("-J".into());
+        args.push(jump.clone());
+    }
+
+    args.push("-P".into());
+    args.push(session.port.to_string());
+
+    if let Some(ref key) = session.ssh_key {
+        args.push("-i".into());
+        args.push(key.clone());
+    }
+
+    let src = format!("{}@{}:{}", session.username, session.host, remote_path);
+    args.push(src);
+    args.push(local_path.to_string_lossy().into_owned());
+
+    args
+}
+
+/// Build an SCP "upload" command: local path -> remote session.
+///
+/// Uses the session's own SSH options.
+pub fn build_upload_args(
+    session: &ResolvedSession,
+    local_path: &Path,
+    remote_path: &str,
+) -> Vec<String> {
+    let mut args = Vec::new();
+
+    if let Some(ref jump) = session.jump_target {
+        args.push("-J".into());
+        args.push(jump.clone());
+    }
+
+    args.push("-P".into());
+    args.push(session.port.to_string());
+
+    if let Some(ref key) = session.ssh_key {
+        args.push("-i".into());
+        args.push(key.clone());
+    }
+
+    args.push(local_path.to_string_lossy().into_owned());
+    let dst = format!("{}@{}:{}", session.username, session.host, remote_path);
+    args.push(dst);
+
+    args
+}
+
+/// Strategy for a host-to-host copy operation.
+#[derive(Debug, PartialEq, Eq)]
+pub enum CopyStrategy {
+    /// Single `scp` command — source and destination share connection config
+    /// (same jump host or both direct).
+    Direct,
+    /// Two-step copy via a local temp file — jump configurations differ and
+    /// cannot be expressed in a single `scp` invocation.
+    ViaLocal,
+}
+
+/// Choose a copy strategy based on whether the two sessions have compatible
+/// jump-host configurations for a single `scp` call.
+pub fn host_copy_strategy(source: &ResolvedSession, dest: &ResolvedSession) -> CopyStrategy {
+    if source.jump_target == dest.jump_target {
+        CopyStrategy::Direct
+    } else {
+        CopyStrategy::ViaLocal
+    }
+}
+
+/// Run an SCP command and return an error on failure.
+pub fn run_scp(args: &[String], display: &str) -> Result<(), DeployError> {
+    let output = Command::new(SCP_BINARY).args(args).output().map_err(|e| {
+        if e.kind() == io::ErrorKind::NotFound {
+            DeployError::ScpNotFound(e)
+        } else {
+            DeployError::ExecFailed(e)
+        }
+    })?;
+
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+        let code = output.status.code().unwrap_or(-1);
+        return Err(DeployError::ScpFailed(code, format!("{display}: {stderr}")));
+    }
+
+    Ok(())
+}
+
 /// Deploy the local config file to a single remote session via SCP.
 ///
 /// Steps:
@@ -353,6 +488,119 @@ mod tests {
                 "22",
                 "/tmp/c.toml",
                 "admin@10.0.0.1:~/config.toml"
+            ]
+        );
+    }
+
+    #[test]
+    fn host_copy_args_basic() {
+        let src = make_resolved(|s| {
+            s.name = "src".into();
+            s.host = "1.1.1.1".into();
+            s.username = "alice".into();
+        });
+        let dst = make_resolved(|s| {
+            s.name = "dst".into();
+            s.host = "2.2.2.2".into();
+            s.username = "bob".into();
+        });
+        let args = build_host_copy_args(&src, "~/file.txt", &dst, "~");
+        assert_eq!(
+            args,
+            vec!["-P", "22", "alice@1.1.1.1:~/file.txt", "bob@2.2.2.2:~"]
+        );
+    }
+
+    #[test]
+    fn host_copy_args_with_shared_jump() {
+        let src = make_resolved(|s| {
+            s.ssh_key = Some("/keys/k".into());
+            s.jump_target = Some("ops@bastion:22".into());
+            s.port = 2222;
+        });
+        let dst = make_resolved(|s| {
+            s.host = "2.2.2.2".into();
+            s.username = "bob".into();
+            s.jump_target = Some("ops@bastion:22".into());
+        });
+        let args = build_host_copy_args(&src, "/tmp/a", &dst, "/tmp/b");
+        assert_eq!(
+            args,
+            vec![
+                "-J",
+                "ops@bastion:22",
+                "-P",
+                "2222",
+                "-i",
+                "/keys/k",
+                "admin@10.0.0.1:/tmp/a",
+                "bob@2.2.2.2:/tmp/b"
+            ]
+        );
+    }
+
+    #[test]
+    fn copy_strategy_direct_when_both_direct() {
+        let a = make_resolved(|_| {});
+        let b = make_resolved(|_| {});
+        assert_eq!(host_copy_strategy(&a, &b), CopyStrategy::Direct);
+    }
+
+    #[test]
+    fn copy_strategy_direct_when_same_jump() {
+        let a = make_resolved(|s| s.jump_target = Some("ops@bastion:22".into()));
+        let b = make_resolved(|s| s.jump_target = Some("ops@bastion:22".into()));
+        assert_eq!(host_copy_strategy(&a, &b), CopyStrategy::Direct);
+    }
+
+    #[test]
+    fn copy_strategy_via_local_when_different_jumps() {
+        let a = make_resolved(|s| s.jump_target = Some("ops@bastion1:22".into()));
+        let b = make_resolved(|s| s.jump_target = Some("ops@bastion2:22".into()));
+        assert_eq!(host_copy_strategy(&a, &b), CopyStrategy::ViaLocal);
+    }
+
+    #[test]
+    fn copy_strategy_via_local_when_only_source_has_jump() {
+        let a = make_resolved(|s| s.jump_target = Some("ops@bastion:22".into()));
+        let b = make_resolved(|_| {});
+        assert_eq!(host_copy_strategy(&a, &b), CopyStrategy::ViaLocal);
+    }
+
+    #[test]
+    fn download_args_basic() {
+        let s = make_resolved(|s| {
+            s.ssh_key = Some("/keys/k".into());
+        });
+        let args = build_download_args(&s, "~/remote.txt", Path::new("/tmp/local.txt"));
+        assert_eq!(
+            args,
+            vec![
+                "-P",
+                "22",
+                "-i",
+                "/keys/k",
+                "admin@10.0.0.1:~/remote.txt",
+                "/tmp/local.txt"
+            ]
+        );
+    }
+
+    #[test]
+    fn upload_args_basic() {
+        let s = make_resolved(|s| {
+            s.jump_target = Some("ops@bastion:22".into());
+        });
+        let args = build_upload_args(&s, Path::new("/tmp/local.txt"), "~/remote.txt");
+        assert_eq!(
+            args,
+            vec![
+                "-J",
+                "ops@bastion:22",
+                "-P",
+                "22",
+                "/tmp/local.txt",
+                "admin@10.0.0.1:~/remote.txt"
             ]
         );
     }

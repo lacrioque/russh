@@ -1,5 +1,6 @@
 pub mod check;
 pub mod connect;
+pub mod copy;
 pub mod deploy;
 pub mod edit;
 pub mod exec;

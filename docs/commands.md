@@ -121,6 +121,47 @@ russh exec prod-db "pg_dump mydb | gzip > /tmp/backup.sql.gz" -T
 }
 ```
 
+## russh copy
+
+```bash
+russh copy <source> <source-path> <dest> [dest-path] [OPTIONS]
+```
+
+Copy a file between two configured sessions via SCP.
+
+**Arguments**:
+
+| Argument | Description |
+|----------|-------------|
+| `source` | Source session name |
+| `source-path` | Path on the source host |
+| `dest` | Destination session name |
+| `dest-path` | Path on the destination host (optional; defaults to `~`) |
+
+**Options**:
+
+| Flag | Description |
+|------|-------------|
+| `-n, --dry-run` | Show what would be done without executing |
+
+**Jump host handling**:
+
+- If source and destination share the same jump host (or both connect directly), a single `scp` command is used
+- If they use **different** jump hosts, russh falls back to a two-step copy via a local temp file so each leg routes through the correct bastion
+
+**Examples**:
+
+```bash
+# Direct copy, dest path defaults to ~
+russh copy prod-web /var/log/app.log backup-host
+
+# Explicit destination path
+russh copy prod-db ~/dump.sql backup-host ~/archives/
+
+# Preview
+russh copy prod-web /etc/nginx/nginx.conf staging -n
+```
+
 ## russh check
 
 ```bash
@@ -279,7 +320,7 @@ Print the version number and config file path.
 **Output example**:
 
 ```
-russh 1.0.3
+russh 1.1.0
 config: /home/user/.config/russh/config.toml
 ```
 

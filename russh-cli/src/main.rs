@@ -37,6 +37,22 @@ enum Command {
         /// Session name
         session: String,
     },
+    /// Copy a file between two sessions via SCP
+    ///
+    /// Example: russh copy src-server ~/file.txt dst-server ~/backup/
+    Copy {
+        /// Source session name
+        source: String,
+        /// Path on the source host
+        source_path: String,
+        /// Destination session name
+        dest: String,
+        /// Path on the destination host (defaults to ~)
+        dest_path: Option<String>,
+        /// Show what would be done without executing
+        #[arg(long, short = 'n')]
+        dry_run: bool,
+    },
     /// Execute a one-off command on a remote session
     ///
     /// Example: russh exec dev-server "uptime"
@@ -215,6 +231,22 @@ fn main() -> Result<()> {
         }
         Command::Connect { session } => {
             commands::connect::run(&session, cli.config.as_deref())?;
+        }
+        Command::Copy {
+            source,
+            source_path,
+            dest,
+            dest_path,
+            dry_run,
+        } => {
+            commands::copy::run(
+                &source,
+                &source_path,
+                &dest,
+                dest_path.as_deref(),
+                dry_run,
+                cli.config.as_deref(),
+            )?;
         }
         Command::Exec {
             session,

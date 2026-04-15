@@ -160,6 +160,146 @@ host = ""
         .failure();
 }
 
+// ── copy ────────────────────────────────────────────────────────────────────
+
+#[test]
+fn copy_dry_run_direct_prints_single_scp() {
+    let cfg = write_config(
+        r#"
+[sessions.a]
+host = "1.1.1.1"
+username = "alice"
+
+[sessions.b]
+host = "2.2.2.2"
+username = "bob"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "copy",
+            "a",
+            "~/file.txt",
+            "b",
+            "~/backup/",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("direct"))
+        .stdout(predicate::str::contains("alice@1.1.1.1:~/file.txt"))
+        .stdout(predicate::str::contains("bob@2.2.2.2:~/backup/"));
+}
+
+#[test]
+fn copy_dry_run_defaults_dest_path_to_tilde() {
+    let cfg = write_config(
+        r#"
+[sessions.a]
+host = "1.1.1.1"
+
+[sessions.b]
+host = "2.2.2.2"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "copy",
+            "a",
+            "/tmp/thing",
+            "b",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("2.2.2.2:~"));
+}
+
+#[test]
+fn copy_dry_run_different_jumps_uses_two_steps() {
+    let cfg = write_config(
+        r#"
+[sessions.bastion1]
+host = "bastion1.example.com"
+
+[sessions.bastion2]
+host = "bastion2.example.com"
+
+[sessions.a]
+host = "10.0.0.1"
+jump = "bastion1"
+
+[sessions.b]
+host = "10.0.0.2"
+jump = "bastion2"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "copy",
+            "a",
+            "~/file.txt",
+            "b",
+            "~/",
+            "--dry-run",
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("different jump hosts"))
+        .stdout(predicate::str::contains("step 1"))
+        .stdout(predicate::str::contains("step 2"));
+}
+
+#[test]
+fn copy_unknown_source_fails() {
+    let cfg = write_config(
+        r#"
+[sessions.b]
+host = "2.2.2.2"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "copy",
+            "nosuch",
+            "/x",
+            "b",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nosuch"));
+}
+
+#[test]
+fn copy_unknown_dest_fails() {
+    let cfg = write_config(
+        r#"
+[sessions.a]
+host = "1.1.1.1"
+"#,
+    );
+    russh()
+        .args([
+            "--config",
+            cfg.path().to_str().unwrap(),
+            "copy",
+            "a",
+            "/x",
+            "nosuch",
+        ])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("nosuch"));
+}
+
 // ── show ─────────────────────────────────────────────────────────────────────
 
 #[test]
